@@ -1,4 +1,4 @@
-# toolest (working name)
+# mockist
 
 Stub the tool calls your agent makes through the Vercel AI SDK. A stubbed call
 returns a canned value (or throws); any other call runs the real tool. Every call
@@ -8,7 +8,7 @@ is recorded so you can assert what the agent did.
 
 ```ts
 import { generateText } from "ai";
-import { createHarness, wrapVercelTools } from "toolest";
+import { createHarness, wrapVercelTools } from "mockist";
 
 const harness = createHarness({
   onUnhandled: "passthrough", // | "warn" | "error" (fail on any un-stubbed call)
