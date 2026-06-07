@@ -6,7 +6,7 @@ test("stubbed tool returns the canned value; real execute not called", async () 
   const realExecute = vi.fn(async ({ city }: { city: string }) => ({ tempC: 99, city }));
   const harness = createHarness({ stubs: [{ name: "weather", args: { city: "Paris" }, result: { tempC: 21 } }] });
   const wrapped = wrapVercelTools({ weather: { description: "w", execute: realExecute } }, harness);
-  expect(await wrapped.weather.execute!({ city: "Paris" }, {} as any)).toEqual({ tempC: 21 });
+  expect(await wrapped.weather.execute!({ city: "Paris" })).toEqual({ tempC: 21 });
   expect(realExecute).not.toHaveBeenCalled();
   expect(harness.trajectory[0]).toMatchObject({ kind: "tool", name: "weather", stubbed: true });
 });
@@ -15,7 +15,7 @@ test("unstubbed tool passes through to real execute", async () => {
   const realExecute = vi.fn(async ({ city }: { city: string }) => ({ tempC: 99, city }));
   const harness = createHarness({ stubs: [{ name: "weather", args: { city: "Paris" }, result: { tempC: 21 } }] });
   const wrapped = wrapVercelTools({ weather: { description: "w", execute: realExecute } }, harness);
-  expect(await wrapped.weather.execute!({ city: "Berlin" }, {} as any)).toEqual({ tempC: 99, city: "Berlin" });
+  expect(await wrapped.weather.execute!({ city: "Berlin" })).toEqual({ tempC: 99, city: "Berlin" });
   expect(realExecute).toHaveBeenCalledTimes(1);
   expect(harness.trajectory[0]).toMatchObject({ name: "weather", stubbed: false });
 });

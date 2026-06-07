@@ -11,5 +11,5 @@ test("exports the expected surface", () => {
 test("composes end to end", async () => {
   const harness = toolest.createHarness({ stubs: toolest.defineStubs([{ name: "ping", result: "pong" }]) });
   const wrapped = toolest.wrapVercelTools({ ping: { execute: async () => "real" } }, harness);
-  expect(await wrapped.ping.execute!({}, {} as any)).toBe("pong");
+  expect(await wrapped.ping.execute!()).toBe("pong");
 });
