@@ -98,6 +98,7 @@ Recording/replaying real runs; mocking dependencies inside a tool's `execute`; M
 
 ## Backlog
 
+- **Build, package, and validate against Synapse** (next milestone) — make mockist a consumable npm package (emit `dist/`, set `main`/`module`/`types`/`exports`, drop `private`), then iteratively dogfood it against `../synapse`: replace real agent tool/skill hand-mocks with mockist and confirm it catches what the mocks miss. This proves we're building the right thing and will reprioritize the items below — especially dependency-replay, since Synapse's bugs lived inside tools. See `docs/BACKLOG.md`.
 - **Sequential stubs** — `[error, then ok]` so a clean retry-to-success can be tested. (Until then, a stateful result function is the workaround.)
 - **Record → generate stubs** — capture real runs and emit hand-editable stubs (what the extension seams enable).
 - **Dependency replay inside `execute`** — mock the DB/HTTP a tool performs internally.
