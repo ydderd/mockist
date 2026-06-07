@@ -19,7 +19,7 @@ Both run the agent with tools stubbed underneath, then assert — one on a tool'
 ## Scope
 
 - Stubs whole tool calls **at the tool boundary**. It does not mock the DB/HTTP *inside* a tool's `execute`.
-- The developer **supplies the model** (a real one, or the SDK's `MockLanguageModelV2`). We don't mock the model.
+- The developer **supplies the model** (a real one, or the SDK's `MockLanguageModelV3`). We don't mock the model.
 - Stubs are **hand-authored**. Recording real runs to generate stubs is out of scope (see Extension seams).
 - **In-process library**: no daemon, no network, no account. Opt-in is two lines.
 
@@ -83,7 +83,7 @@ Four shapes exist so a future record-and-replay capability (capture real calls, 
 
 ## Acceptance criteria
 
-Driving a real `generateText` loop with `MockLanguageModelV2`:
+Driving a real `generateText` loop with `MockLanguageModelV3`:
 
 1. A stubbed tool returns its value to the model; the real `execute` never runs; the trajectory shows it stubbed.
 2. An error-injecting stub produces the recorded error and the agent runs its failure path.
@@ -128,7 +128,7 @@ const harness = createHarness({
 });
 
 const result = await generateText({
-  model, // user-supplied (real or MockLanguageModelV2)
+  model, // user-supplied (real or MockLanguageModelV3)
   tools: wrapVercelTools(myTools, harness),
   prompt: "What's the weather in Paris?",
 });
