@@ -1,144 +1,116 @@
-# Declarative Tool-Stub Harness — Design / Requirements Spec
+# Declarative Tool-Stub Harness — Requirements
 
 **Date:** 2026-06-06
-**Status:** Approved (requirements). Implementation plan to follow.
-**Companion docs:** [PRIMER.md](../../../PRIMER.md), [OUTLINE.md](../../../OUTLINE.md)
+**Status:** Approved requirements.
 
----
+## Goal
 
-## 1. Context & problem
+A TypeScript library that stubs the tool calls an agent makes through the Vercel AI SDK. A stubbed call returns a canned value (or throws); any other call runs the real tool. Every call is recorded so tests can assert what the agent did.
 
-When you build an agent, you hand an SDK a tools array and let a model call those tools. Testing that layer today means hand-mocking each tool's behavior — brittle, drifts from reality, and the unit-of-work the model actually drives (the tool call) is the least-tested part of the stack.
+## Who it's for
 
-This MVP delivers the smallest useful thing: **let a developer declaratively stub the tool calls an agent makes through the Vercel AI SDK, so tests are deterministic; everything not stubbed passes through to the real tool; and every call is recorded so you can assert on what the agent did.**
+A developer testing a Vercel AI SDK agent who needs two things:
 
-This is not a novel category — it is **test-doubles (stubs + spies) applied to agent tool calls**. The design deliberately mirrors settled patterns (`jest.fn()`, Sinon stubs, MSW handlers, pytest `Mock`, Elixir `Mox`) so the learning curve is near zero and we inherit proven ergonomics instead of inventing them.
+- **Deterministic tool tests** — stub slow/costly/external tools so the suite is fast and repeatable, and assert the outcomes.
+- **Trajectory tests** — assert which tools the model called, with what arguments, in what order, and that it handled a tool failure.
 
-## 2. Users & primary jobs
+Both run the agent with tools stubbed underneath, then assert — one on a tool's outcome, the other on the model's behavior.
 
-A developer (solo or team) building an agent on the **Vercel AI SDK** who wants tests that don't hit real tools. Two jobs, served by one harness:
+## Scope
 
-- **J1 — Deterministic tool-code tests.** Stub the tools you don't want to really run (slow/costly/external); let the tool-under-test pass through; assert its recorded output/outcome. Run fast and deterministically in CI.
-- **J2 — Agent trajectory tests.** Assert the *model's* behavior: which tools it called, with what args, in what order, and that it handled an injected tool failure.
+- Stubs whole tool calls **at the tool boundary**. It does not mock the DB/HTTP *inside* a tool's `execute`.
+- The developer **supplies the model** (a real one, or the SDK's `MockLanguageModelV2`). We don't mock the model.
+- Stubs are **hand-authored**. Recording real runs to generate stubs is out of scope (see Extension seams).
+- **In-process library**: no daemon, no network, no account. Opt-in is two lines.
 
-Both jobs run the agent with tools stubbed underneath, then assert — J1 on the tool's execution/outcome, J2 on the model's behavior. Same harness, two assertion targets.
+## Requirements
 
-## 3. Philosophy & prior-art mapping
+1. **Wrap** — `wrapVercelTools(tools, harness)` returns a tools object that routes every tool's `execute` through the harness; the developer passes it to `generateText`/`streamText` in place of the original tools.
+2. **Match on name + args** — a stub matches when its `name` (and `kind`, default `"tool"`) equal the call, and: its `match` predicate passes if given, else its `args` deep-equal the input if given, else it matches the name alone. First match wins.
+3. **Return or pass through** — a match returns the stub's value (a literal, or a function of the input; may be async). No match runs the real `execute`, subject to the unhandled-call policy (req. 8).
+4. **Inject failures** — a stub can throw / return an error instead of a value. It is recorded with the error.
+5. **Record a trajectory** — every call is recorded in order: `kind`, `name`, `input`, `output` or `error`, whether it was stubbed, a timestamp, and a stable key.
+6. **Assert on plain data** — `harness.trajectory` is a typed, read-only array, with helpers (`callsTo(name)`, `calledWith(name, input)`, counts/order). Developers assert with their runner's own `expect`/`assert`. No custom matchers.
+7. **Preserve real behavior** — pass-through keeps `execute` semantics (async, the SDK's second `options` argument). A tool with no `execute` passes through unwrapped.
+8. **Unhandled-call policy** — `onUnhandled: 'passthrough' (default) | 'warn' | 'error'`. `'error'` throws on any un-stubbed tool call, giving a fully sealed test.
+9. **Reset** — `harness.reset()` clears the trajectory between tests.
 
-The API should read like the tools developers already know. Mapping of our concepts to established patterns:
+## Non-functional
 
-| Our concept | Jest / Sinon | pytest | Elixir / Mox | MSW / nock |
-|---|---|---|---|---|
-| Stub returns value | `mockResolvedValue` / `stub.returns` | `Mock(return_value=)` | `Mox.stub/3` | `http.get(url, resolver)` |
-| Match on name + args | `stub.withArgs(...)` | callable `side_effect` | `expect` w/ pattern | request matcher |
-| Pass-through on miss | `stub.callThrough()` | call the real fn | — | `passthrough()` |
-| Error injection | `mockRejectedValue` / `stub.throws` | `side_effect=Exc` | raise in fn | error response |
-| Trajectory (spy log) | `toHaveBeenCalledWith` | `mock.call_args_list` | `verify!` | `.calls` |
-| Reset between tests | `clearMocks` / `afterEach` | fixture teardown | per-test | `resetHandlers()` |
-| Unhandled-call policy | — | — | strict by default | `onUnhandledRequest` |
-| Record → replay (deferred) | — | **vcrpy** | — | **nock.back / Polly** |
+- TypeScript, ESM, strict.
+- `ai` is a peer dependency of the published package (a dev dependency for our own tests).
+- Runner-agnostic; works under vitest / jest / node:test with no runner as a hard dependency.
+- Deterministic: no randomness or wall-clock in matching.
+- The adapter relies only on the public fact that a Vercel tool is an object with an optional `execute(input, options)` — it does not import the SDK's internal types.
 
-## 4. Scope boundary
+## Familiar vocabulary
 
-- **Tool-only.** We wrap tools and record the trajectory. We do not touch the model.
-- **Tool-boundary stubbing.** We replace whole tool calls. We do **not** reach inside a tool's `execute` to mock its internal DB/HTTP dependencies (that is the deferred "dependency replay" layer).
-- **User brings the model.** The developer passes whatever model they want — a real one, or the AI SDK's built-in `MockLanguageModelV2` to script tool-call decisions. We do not provide model mocking.
-- **Mode 1 only.** Stubs are hand-authored. Recording real runs to generate stubs (Mode 2) is deferred, but its seams are built now (§7).
-- **In-process library.** No daemon, no IPC, no network, no account. Opt-in is ~2 lines.
+The API uses the names developers already know from existing test doubles, so there is little to learn:
 
-## 5. Functional requirements
+| This library | Jest / Sinon | pytest | MSW |
+|---|---|---|---|
+| stub returns value | `mockResolvedValue` / `stub.returns` | `Mock(return_value=)` | `http.get(url, resolver)` |
+| match on name + args | `stub.withArgs(...)` | callable `side_effect` | request matcher |
+| pass through on miss | `stub.callThrough()` | call the real fn | `passthrough()` |
+| inject failure | `mockRejectedValue` / `stub.throws` | `side_effect=Exc` | error response |
+| trajectory | `toHaveBeenCalledWith` | `mock.call_args_list` | `.calls` |
+| unhandled-call policy | — | — | `onUnhandledRequest` |
 
-- **FR1 — Wrap.** `wrapVercelTools(tools, harness)` returns a tools object whose every tool routes its `execute` through the harness. Drop-in: the result is passed to `generateText`/`streamText` in place of the original tools.
-- **FR2 — Match (name + args).** A stub matches when its `kind` (default `"tool"`) and `name` equal the call and:
-  - a `match` predicate is satisfied (takes precedence), else
-  - `args` deep-equals the call input, else
-  - neither is given (matches the name regardless of input).
-  First matching stub wins.
-- **FR3 — Stub result / pass-through.** A hit returns a canned value (a literal, or a function of the input; may be async). A miss runs the real `execute` (**pass-through**), unless overridden by the unhandled-call policy (FR9).
-- **FR4 — Error injection.** A stub can make the tool **fail** (throw / surface an error) instead of returning a value, recorded as `stubbed: true` with the `error`. (Note: first-class "fail first, then succeed" sequencing is backlogged — see §9. A stateful result function is the escape hatch in the meantime.)
-- **FR5 — Trajectory (spy).** Every tool call is recorded in invocation order with: `kind`, `name`, `input`, `output` or `error`, `stubbed` flag, `ts`, and a stable `key`.
-- **FR6 — Assertion surface (plain data).** Expose `harness.trajectory` as a typed, read-only array, plus a small set of query helpers (e.g. `callsTo(name)`, `calledWith(name, input)`, counts/order). Developers assert with their own runner's `expect`/`assert`. **No framework-specific matchers** in MVP.
-- **FR7 — Fidelity.** Pass-through preserves the real `execute` semantics (async, the SDK's second `options` argument). Tools without an `execute` (client-side / forwarded tools) pass through untouched and unwrapped.
-- **FR8 — Reset.** `harness.reset()` clears the trajectory between tests.
-- **FR9 — Unhandled-call policy.** A harness option `onUnhandled: 'passthrough' | 'warn' | 'error'` (default `'passthrough'`). `'error'` throws on any un-stubbed tool call — a fully sealed deterministic test (serves J1). `'warn'` logs and passes through.
+## Architecture
 
-## 6. Non-functional requirements
+A framework-agnostic core behind a thin Vercel adapter:
 
-- **NFR1 — Friction is binary.** Adoption must be ~2 lines (`createHarness(...)` + `wrapVercelTools(...)`). No account, no config files, no network.
-- **NFR2 — TS-first, ESM.** Strict TypeScript; ships as an npm package.
-- **NFR3 — Runner-agnostic.** Works under any test runner (vitest, jest, node:test); no runner is a hard dependency. (`ai` is a peer dependency in the product; a dev dependency for our own tests.)
-- **NFR4 — Determinism.** Given the same stubs and the same model behavior, results are identical. No randomness or wall-clock in matching.
-- **NFR5 — Version tolerance.** The adapter relies only on the public contract that a Vercel tool is an object with an optional `execute(input, options)` (because `tool()` is an identity function in the SDK). It does not import the SDK's internal types.
-
-## 7. Architecture (ratifies the prior design)
-
-A framework-agnostic core behind a thin Vercel adapter.
-
-```
-wrapVercelTools(tools, harness)            ← ~2-line opt-in
-        │  per execute() call
-        ▼
-   Vercel adapter ──► harness.dispatch(kind, name, input, original)
-                              │
-                              ├─ walk resolvers (ordered): first hit → stub value/error
-                              ├─ no hit → onUnhandled policy: passthrough(run original) | warn | error
-                              └─ record Call (stubbed flag, output/error) → Recorder (in-memory)
-```
-
-**Units (one responsibility each):**
-- `core/types.ts` — `Call`, `Stub`, `Resolver`, `CallKind`, `Resolution` (shared shapes).
-- `core/identity.ts` — `identify(kind, name, input) → key` + stable stringify.
-- `core/registry.ts` — `defineStubs` + `predicateResolver` (name / name+args / predicate).
+- `core/types.ts` — `Call`, `Stub`, `Resolver`, `CallKind`.
+- `core/identity.ts` — `identify(kind, name, input) → key`.
+- `core/registry.ts` — `defineStubs` + `predicateResolver`.
 - `core/recorder.ts` — in-memory trajectory + redaction hook.
-- `core/harness.ts` — `createHarness` / `dispatch`: resolver pipeline + unhandled-call policy + recording. Exposes `trajectory`, query helpers, `reset()`.
-- `adapters/vercel.ts` — `wrapVercelTools` (the execution seam).
+- `core/harness.ts` — `createHarness` / `dispatch`: resolver pipeline + unhandled-call policy + recording; exposes `trajectory`, helpers, `reset()`.
+- `adapters/vercel.ts` — `wrapVercelTools`.
 - `index.ts` — public API.
 
-**`CallKind` is `"tool" | "skill" | "subagent"`.** Only the **tool** adapter ships in the MVP, but the core types and matching already support the other kinds so future adapters are additive.
+On each tool call the adapter calls `harness.dispatch(kind, name, input, original)`: walk the resolvers, first hit wins; on no hit, apply the unhandled-call policy (run `original`, warn, or throw); record the call either way.
 
-**The four Mode-2 seams (present but inert in the MVP)** — built now so record→replay is additive:
-1. **Call-identity** — `identify(kind, name, input)`; stamped on each `Call` now, reused as a fixture key later.
-2. **Normalized `Call` record** — one struct used by the recorder now and by Mode-2 persistence later.
-3. **Ordered resolver pipeline** — `resolvers: Resolver[]`; Mode 2 inserts a `fixtureResolver` before pass-through with zero adapter changes.
-4. **Redaction hook** — `redact?: (call) => Call` on the recorder, no-op by default; required before any production capture.
+`CallKind` is `"tool" | "skill" | "subagent"`. Only the tool adapter ships now; the types support the other kinds so future adapters are additive.
 
-## 8. Acceptance criteria (definition of done)
+## Extension seams (built now, not implemented now)
+
+Four shapes exist so a future record-and-replay capability (capture real calls, generate stubs from them) can be added without a rewrite. None of them add behavior today:
+
+- **Stable call identity** — `identify(kind, name, input)`; stamped on each recorded call now, reusable as a fixture key later.
+- **One Call record shape** — used by the recorder now; the same struct for persisted fixtures later.
+- **Ordered resolver list** — `resolvers: Resolver[]`; a future fixture-replay resolver inserts before pass-through with no adapter change.
+- **Redaction hook** — `redact?: (call) => Call`, no-op by default; required before capturing real (production) calls.
+
+## Acceptance criteria
 
 Driving a real `generateText` loop with `MockLanguageModelV2`:
 
-1. **Stub hit:** a stubbed tool returns its canned value to the model; the real `execute` never runs; the trajectory records `stubbed: true` with that output.
-2. **Error path:** an error-injecting stub causes the recorded `error` (`stubbed: true`), and the agent handles it (surfaces it / responds), demonstrating the J2 error path. (Clean retry-to-success is out of scope — needs the backlogged sequential stubs.)
-3. **Pass-through:** an un-stubbed tool runs the real `execute`; the trajectory records `stubbed: false` and the real output.
-4. **Sealed test:** with `onUnhandled: 'error'`, an un-stubbed tool call throws instead of running.
-5. **Assertions:** all of the above are asserted using plain trajectory data + query helpers — no custom matcher required.
-6. **Fidelity:** a tool without an `execute` is returned untouched; pass-through receives the SDK's `options` argument.
+1. A stubbed tool returns its value to the model; the real `execute` never runs; the trajectory shows it stubbed.
+2. An error-injecting stub produces the recorded error and the agent runs its failure path.
+3. An un-stubbed tool runs for real; the trajectory shows it not stubbed, with the real output.
+4. With `onUnhandled: 'error'`, an un-stubbed call throws instead of running.
+5. All of the above are asserted with plain trajectory data — no custom matcher.
+6. A tool with no `execute` is returned untouched; pass-through receives the SDK's `options` argument.
 
-## 9. Non-goals (MVP) and backlog
+## Out of scope (this version)
 
-**Explicit non-goals for the MVP:**
-- Mode 2 record → replay (the VCR/cassette pattern).
-- Dependency-mocking *inside* a tool's `execute` (DB/HTTP).
-- MCP, Anthropic, skill, or sub-agent adapters.
-- Model mocking (the user brings the model).
-- Custom test-runner matchers.
-- Any hosted / CI-gating / eval-scoring features.
+Recording/replaying real runs; mocking dependencies inside a tool's `execute`; MCP / Anthropic / skill / sub-agent adapters; model mocking; custom test-runner matchers; any hosted / CI-gating / eval-scoring features.
 
-**Backlog (recorded now, post-MVP):**
-- **Sequential / once stubs** — `side_effect=[err, ok]` / `mockReturnValueOnce`; first-class "fail then succeed" for J2 recovery.
-- **Record → replay (VCR/cassette)** — capture real runs and codegen Mode-1 stubs (vcrpy / Polly / nock.back lineage). Additive via the §7 seams.
-- **Dependency replay inside `execute`** — the original PRIMER moat.
-- **Additional adapters** — MCP, Anthropic / Claude Agent SDK (skills and sub-agents flow through its one tool-call/hook path), OpenAI.
-- **Custom matchers** — optional `toHaveCalledTool` / `toMatchTrajectory` packages once we know which runner users want.
-- **Schema-grounded stub generation/validation** — use the tool's JSON Schema (which we get for free) to validate a stub's output against the tool's declared type, and later AI-generate a starter stub from the schema. (Idea borrowed from `mock-mcp`'s schema-as-contract approach; a third stub-*sourcing* strategy alongside hand-authored and recorded.)
+## Backlog
 
-## 10. Anti-goals (confirmed by surveying prior art)
+- **Sequential stubs** — `[error, then ok]` so a clean retry-to-success can be tested. (Until then, a stateful result function is the workaround.)
+- **Record → generate stubs** — capture real runs and emit hand-editable stubs (what the extension seams enable).
+- **Dependency replay inside `execute`** — mock the DB/HTTP a tool performs internally.
+- **More adapters** — MCP, Anthropic / Claude Agent SDK (skills and sub-agents flow through its tool-call path), OpenAI.
+- **Optional runner-specific matchers** — e.g. `toHaveCalledTool`, once we know which runner users want.
+- **Schema-grounded stubs** — validate a stub's output against the tool's JSON Schema, and generate a starter stub from it.
 
-- **No daemon / IPC / adapter / MCP-in-the-loop architecture** (as in `mock-mcp`). It violates NFR1 (friction is binary). Stay in-process.
-- **No non-deterministic, AI-generated mocks in the core.** Our value is determinism for CI. AI/schema generation, if ever added, is an opt-in *authoring aid* that emits concrete stubs — never the runtime behavior.
+## Not this
 
----
+- **No daemon / IPC / server.** It breaks the two-line opt-in.
+- **No AI-generated, non-deterministic mocks in the runtime.** Determinism is the point. If generation is ever added, it is an authoring aid that emits concrete stubs — never runtime behavior.
 
-## Appendix — illustrative API (non-binding; the plan pins exact signatures)
+## Appendix — illustrative API (the plan pins exact signatures)
 
 ```ts
 import { generateText } from "ai";
@@ -147,10 +119,10 @@ import { createHarness, wrapVercelTools, defineStubs } from "toolest"; // name T
 const harness = createHarness({
   onUnhandled: "passthrough", // | "warn" | "error"
   stubs: defineStubs([
-    { name: "get_weather", args: { city: "Paris" }, result: { tempC: 21 } }, // name+args
+    { name: "get_weather", args: { city: "Paris" }, result: { tempC: 21 } }, // name + args
     { name: "search", match: (i) => i.q.includes("docs"), result: { hits: [] } }, // predicate
-    { name: "flaky", result: () => { throw new Error("upstream 503"); } }, // error injection
-    { name: "now", result: "2026-06-06T00:00:00Z" }, // name-only
+    { name: "flaky", result: () => { throw new Error("upstream 503"); } }, // failure
+    { name: "now", result: "2026-06-06T00:00:00Z" }, // name only
   ]),
 });
 
@@ -160,7 +132,6 @@ const result = await generateText({
   prompt: "What's the weather in Paris?",
 });
 
-// assert with plain data
 expect(harness.callsTo("get_weather")).toHaveLength(1);
 expect(harness.trajectory[0]).toMatchObject({ name: "get_weather", stubbed: true });
 ```
