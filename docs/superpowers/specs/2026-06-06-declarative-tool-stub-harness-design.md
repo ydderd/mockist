@@ -114,7 +114,7 @@ Recording/replaying real runs; mocking dependencies inside a tool's `execute`; M
 
 ```ts
 import { generateText } from "ai";
-import { createHarness, wrapVercelTools, defineStubs } from "toolest"; // name TBD
+import { createHarness, wrapVercelTools, defineStubs } from "mockist";
 
 const harness = createHarness({
   onUnhandled: "passthrough", // | "warn" | "error"

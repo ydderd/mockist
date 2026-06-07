@@ -24,7 +24,7 @@ Only the end-to-end task (Task 8) touches the `ai` SDK; Tasks 2–7 are pure Typ
 
 ```json
 {
-  "name": "toolest",
+  "name": "mockist",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -607,10 +607,10 @@ export class Harness {
     }
 
     if (this.onUnhandled === "error") {
-      throw new Error(`toolest: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
+      throw new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
     }
     if (this.onUnhandled === "warn") {
-      console.warn(`toolest: unhandled ${kind} call "${name}" — passing through`);
+      console.warn(`mockist: unhandled ${kind} call "${name}" — passing through`);
     }
 
     try {
@@ -769,18 +769,18 @@ git commit -m "feat: Vercel AI SDK adapter wrapping tool execute"
 
 ```ts
 import { expect, test } from "vitest";
-import * as toolest from "../src/index";
+import * as mockist from "../src/index";
 
 test("exports the expected surface", () => {
-  expect(typeof toolest.createHarness).toBe("function");
-  expect(typeof toolest.defineStubs).toBe("function");
-  expect(typeof toolest.wrapVercelTools).toBe("function");
-  expect(typeof toolest.identify).toBe("function");
+  expect(typeof mockist.createHarness).toBe("function");
+  expect(typeof mockist.defineStubs).toBe("function");
+  expect(typeof mockist.wrapVercelTools).toBe("function");
+  expect(typeof mockist.identify).toBe("function");
 });
 
 test("composes end to end", async () => {
-  const harness = toolest.createHarness({ stubs: toolest.defineStubs([{ name: "ping", result: "pong" }]) });
-  const wrapped = toolest.wrapVercelTools({ ping: { execute: async () => "real" } }, harness);
+  const harness = mockist.createHarness({ stubs: mockist.defineStubs([{ name: "ping", result: "pong" }]) });
+  const wrapped = mockist.wrapVercelTools({ ping: { execute: async () => "real" } }, harness);
   expect(await wrapped.ping.execute!({}, {} as any)).toBe("pong");
 });
 ```
@@ -961,7 +961,7 @@ git commit -m "test: end-to-end stub, pass-through, and failure injection under 
 - [ ] **Step 1: Write `README.md`**
 
 ````markdown
-# toolest (working name)
+# mockist
 
 Stub the tool calls your agent makes through the Vercel AI SDK. A stubbed call
 returns a canned value (or throws); any other call runs the real tool. Every call
@@ -971,7 +971,7 @@ is recorded so you can assert what the agent did.
 
 ```ts
 import { generateText } from "ai";
-import { createHarness, wrapVercelTools } from "toolest";
+import { createHarness, wrapVercelTools } from "mockist";
 
 const harness = createHarness({
   onUnhandled: "passthrough", // | "warn" | "error" (fail on any un-stubbed call)
