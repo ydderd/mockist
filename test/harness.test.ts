@@ -46,6 +46,15 @@ test("onUnhandled 'error' throws on an un-stubbed call without running original"
   expect(original).not.toHaveBeenCalled();
 });
 
+test("onUnhandled 'error' still records the offending call before throwing", async () => {
+  const harness = createHarness({ onUnhandled: "error" });
+  const original = vi.fn(async () => "real");
+  await expect(harness.dispatch("tool", "x", { a: 1 }, original)).rejects.toThrow(/unhandled/);
+  expect(harness.trajectory).toHaveLength(1);
+  expect(harness.trajectory[0]).toMatchObject({ name: "x", input: { a: 1 }, stubbed: false });
+  expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
+});
+
 test("onUnhandled 'warn' warns then passes through", async () => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   const harness = createHarness({ onUnhandled: "warn" });
