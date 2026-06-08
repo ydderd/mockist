@@ -16,3 +16,12 @@ test("stableStringify sorts nested keys and handles arrays/null", () => {
   expect(stableStringify({ b: 1, a: [3, { y: 2, x: 1 }] })).toBe('{"a":[3,{"x":1,"y":2}],"b":1}');
   expect(stableStringify(null)).toBe("null");
 });
+
+test("stableStringify distinguishes null, undefined, and NaN", () => {
+  expect(stableStringify(undefined)).not.toBe(stableStringify(null));
+  expect(stableStringify(NaN)).not.toBe(stableStringify(null));
+  expect(stableStringify(NaN)).not.toBe(stableStringify(undefined));
+  // also nested, where these values actually survive object serialization
+  expect(stableStringify({ a: undefined })).not.toBe(stableStringify({ a: null }));
+  expect(stableStringify({ a: NaN })).not.toBe(stableStringify({ a: null }));
+});
