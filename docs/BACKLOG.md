@@ -25,4 +25,4 @@ Source of truth for post-MVP work. Mirrors the spec's Backlog section
 
 ## Findings log
 
-- _(Part B appends the Synapse dogfood findings + gate decision here — see Task 8.)_
+- **2026-06-08 Synapse dogfood** → [mockist-dogfood-findings.md](./mockist-dogfood-findings.md). Verdict: **CONTINUE (relief)** — interception shape verified at runtime on the workflow tool path; trajectory + failure-recovery tested with zero dependency mocking. Biggest reprioritization: "dependency replay inside `execute`" is a *separate* capability (the moat for origin-story bugs), not the next adapter increment; new candidate item — sub-agent/whole-workflow harness composition.
