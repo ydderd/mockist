@@ -17,6 +17,10 @@ const harness = createHarness({
     { name: "search", match: (i) => i.q.includes("docs"), result: { hits: [] } }, // predicate
     { name: "flaky", result: () => { throw new Error("upstream 503"); } }, // failure
     { name: "now", result: "2026-06-07T00:00:00Z" }, // name only
+    {
+      name: "retryable",
+      sequence: [{ error: new Error("timeout") }, { result: { ok: true } }],
+    }, // ordered calls
   ],
 });
 
@@ -37,6 +41,26 @@ its `match` predicate passes (if given), else its `args` deep-equal the input (i
 given), else it matches the name regardless of input. First match wins. No match
 runs the real `execute` (pass-through), unless `onUnhandled: "error"`.
 
+## Sequential stubs
+
+Use `sequence` when the same call should behave differently over time: retries,
+pagination, polling, or failure-then-success flows. Each matching call consumes
+one step. A step can return a `result` or throw an `error`.
+
+```ts
+const harness = createHarness({
+  stubs: [{
+    name: "search",
+    args: { q: "billing" },
+    sequence: [
+      { error: new Error("timeout") },
+      { result: { hits: ["doc-1"] } },
+    ],
+    onSequenceExhausted: "error", // default | "repeat-last" | "passthrough"
+  }],
+});
+```
+
 ## Assertions
 
 `harness.trajectory` is a typed, read-only array of every call (`name`, `input`,
@@ -46,6 +70,6 @@ runs the real `execute` (pass-through), unless `onUnhandled: "error"`.
 
 ## Not yet (backlog)
 
-Sequential stubs (`[error, then ok]`); recording real runs to generate stubs;
-mocking dependencies inside a tool's `execute`; adapters for MCP / Anthropic /
-OpenAI. See `docs/superpowers/specs/2026-06-06-declarative-tool-stub-harness-design.md`.
+Recording real runs to generate stubs; mocking dependencies inside a tool's
+`execute`; adapters for MCP / Anthropic / OpenAI. See
+`docs/superpowers/specs/2026-06-06-declarative-tool-stub-harness-design.md`.
