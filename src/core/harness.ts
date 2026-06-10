@@ -1,5 +1,5 @@
-import type { Call, CallKind, Resolver, Stub, UnhandledPolicy } from "./types";
-import { predicateResolver } from "./registry";
+import type { Call, CallKind, Resolver, SequenceStubState, Stub, UnhandledPolicy } from "./types";
+import { predicateResolver, type ResettableResolver } from "./registry";
 import { Recorder, type Redactor } from "./recorder";
 import { deepEqual } from "./deep-equal";
 import { identify } from "./identity";
@@ -20,9 +20,11 @@ export class Harness {
   private readonly recorder: Recorder;
   private readonly onUnhandled: UnhandledPolicy;
   private readonly resetResolvers: Array<() => void>;
+  private readonly stubResolver: ResettableResolver;
 
   constructor(opts: HarnessOptions = {}) {
     const stubResolver = predicateResolver(opts.stubs ?? []);
+    this.stubResolver = stubResolver;
     this.resetResolvers = [stubResolver.reset];
     this.resolvers = [stubResolver, ...(opts.resolvers ?? [])];
     this.recorder = new Recorder(opts.redact);
@@ -39,6 +41,11 @@ export class Harness {
 
   calledWith(name: string, input: unknown): boolean {
     return this.trajectory.some((c) => c.name === name && deepEqual(c.input, input));
+  }
+
+  /** Consumption/exhaustion state of each sequence stub — for "no exhausted sequences" assertions. */
+  sequenceState(): SequenceStubState[] {
+    return this.stubResolver.sequenceState();
   }
 
   reset(): void {

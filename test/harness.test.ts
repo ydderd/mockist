@@ -124,6 +124,37 @@ test("reset clears the trajectory", async () => {
   expect(harness.trajectory).toHaveLength(0);
 });
 
+test("sequenceState reports consumption and exhaustion of sequence stubs", async () => {
+  const harness = createHarness({
+    stubs: [
+      { name: "flaky", sequence: [{ result: "a" }, { result: "b" }], onSequenceExhausted: "repeat-last" },
+      { name: "plain", result: 1 },
+    ],
+  });
+  const original = vi.fn(async () => "real");
+
+  // Nothing consumed yet.
+  expect(harness.sequenceState()).toEqual([
+    { name: "flaky", kind: "tool", length: 2, consumed: 0, exhausted: false },
+  ]);
+
+  await harness.dispatch("tool", "flaky", {}, original);
+  await harness.dispatch("tool", "flaky", {}, original);
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 2, exhausted: false });
+
+  // One more matching call drains it.
+  await harness.dispatch("tool", "flaky", {}, original);
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 2, exhausted: true });
+});
+
+test("sequenceState resets with the harness", async () => {
+  const harness = createHarness({ stubs: [{ name: "once", sequence: [{ result: "only" }] }] });
+  await harness.dispatch("tool", "once", {}, async () => "real");
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 1 });
+  harness.reset();
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 0, exhausted: false });
+});
+
 test("reset rewinds sequence stub cursors", async () => {
   const harness = createHarness({
     stubs: [{

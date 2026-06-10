@@ -45,11 +45,20 @@ Delivered and dogfooded on Synapse (2026-06-08). API reference: [README.md](../R
    does not prove a real model would choose to recover. Remaining precision work folds
    into per-feature docs as they ship.
 
+4. **Trajectory assertion helpers + readable diffs** (2026-06-10) — runner-agnostic
+   assertion core in `src/core/assert.ts`: `expectExactTrajectory`, `expectSubsequence`,
+   `expectCalledTool`, `expectCalledWith` (deep-subset), `expectNoUnhandledCalls`,
+   `expectNoPassthroughCalls`, `expectNoExhaustedSequences`. Each returns
+   `{ pass, message() }` (no throw, no vitest import); failure messages render an
+   expected-vs-actual diff with per-call name/input/output-or-error/stubbed. Also exposed
+   `harness.sequenceState()` (see tech-debt item below). API: [README.md](../README.md#trajectory-assertion-helpers).
+
 ### Tech debt
 
-- **Sequence exhaustion is not queryable** — the harness *acts* on exhaustion (`error` /
-  `repeat-last` / `passthrough`, `registry.ts`) but exposes no public API to ask whether a
-  given sequence ran dry. Fold into the assertion-helpers item (M1).
+- ~~**Sequence exhaustion is not queryable**~~ **(resolved 2026-06-10)** — `harness.sequenceState()`
+  now returns `{ name, kind, length, consumed, exhausted }` per sequence stub; `registry.ts`
+  tracks a per-stub drain counter so "ran dry" is distinguishable from "fully consumed". Powers
+  `expectNoExhaustedSequences`.
 
 ---
 
@@ -93,13 +102,13 @@ engineering.
 
 ### M1 — Test ergonomics (the devex unlock)
 
-1. **Trajectory assertion helpers + readable diffs** — keep the core runner-agnostic, but
-   add assertion functions that can power Vitest/Jest matchers later. Target common
-   expectations: exact trajectory, ordered subsequence, called tool, called with partial
-   input, no unhandled calls, no passthrough calls. Failure messages should show expected
-   vs actual calls with name, input, output/error, and `stubbed` status. This is the next
-   developer-experience unlock: today users manually inspect `harness.trajectory`. Also
-   closes the sequence-exhaustion tech-debt item (expose exhaustion state).
+1. ~~**Trajectory assertion helpers + readable diffs**~~ **(done 2026-06-10)** — runner-agnostic
+   assertion core (`src/core/assert.ts`), no vitest import: exact trajectory, ordered
+   subsequence, called tool, called-with partial input (deep-subset), no-unhandled,
+   no-passthrough, no-exhausted-sequences. Each returns `{ pass, message() }`; failure
+   messages render an expected-vs-actual diff with per-call name/input/output-or-error/stubbed.
+   Closed the sequence-exhaustion tech-debt item via `harness.sequenceState()`. These power
+   the later Vitest/Jest matchers (M3 item 8). See [Done #4](#done).
 2. **Record → replay (VCR/cassette)** — capture real tool-boundary runs and generate
    hand-editable stubs. Additive via the existing extension seams (`identify` / `Call`
    record / resolver pipeline / redaction hook). Deterministic JSON fixtures, redaction

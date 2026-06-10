@@ -4,12 +4,24 @@ export { Recorder, type Redactor } from "./core/recorder";
 export { identify, stableStringify } from "./core/identity";
 export { deepEqual } from "./core/deep-equal";
 export { wrapVercelTools } from "./adapters/vercel";
+export {
+  expectExactTrajectory,
+  expectSubsequence,
+  expectCalledTool,
+  expectCalledWith,
+  expectNoUnhandledCalls,
+  expectNoPassthroughCalls,
+  expectNoExhaustedSequences,
+  type AssertionResult,
+  type ExpectedCall,
+} from "./core/assert";
 export type {
   Call,
   CallKind,
   Resolution,
   Resolver,
   ResolverInput,
+  SequenceStubState,
   Stub,
   StubResult,
   UnhandledPolicy,
