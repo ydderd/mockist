@@ -123,3 +123,21 @@ test("reset clears the trajectory", async () => {
   harness.reset();
   expect(harness.trajectory).toHaveLength(0);
 });
+
+test("reset rewinds sequence stub cursors", async () => {
+  const harness = createHarness({
+    stubs: [{
+      name: "flaky",
+      sequence: [{ error: new Error("503") }, { result: "ok" }],
+    }],
+  });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "flaky", {}, original)).rejects.toThrow("503");
+  await expect(harness.dispatch("tool", "flaky", {}, original)).resolves.toBe("ok");
+
+  harness.reset();
+
+  await expect(harness.dispatch("tool", "flaky", {}, original)).rejects.toThrow("503");
+  await expect(harness.dispatch("tool", "flaky", {}, original)).resolves.toBe("ok");
+});

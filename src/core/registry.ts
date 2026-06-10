@@ -6,11 +6,13 @@ export function defineStubs(stubs: Stub[]): Stub[] {
   return stubs;
 }
 
-/** First stub matching name + (predicate | args | name-only) wins; returns a produce thunk. */
-export function predicateResolver(stubs: Stub[]): Resolver {
-  const cursors = new WeakMap<Stub, number>();
+export type ResettableResolver = Resolver & { reset: () => void };
 
-  return ({ kind, name, input }) => {
+/** First stub matching name + (predicate | args | name-only) wins; returns a produce thunk. */
+export function predicateResolver(stubs: Stub[]): ResettableResolver {
+  let cursors = new WeakMap<Stub, number>();
+
+  const resolve: ResettableResolver = ({ kind, name, input }) => {
     for (const stub of stubs) {
       const stubKind = stub.kind ?? "tool";
       if (stubKind !== kind || stub.name !== name) continue;
@@ -36,6 +38,12 @@ export function predicateResolver(stubs: Stub[]): Resolver {
     }
     return undefined;
   };
+
+  resolve.reset = () => {
+    cursors = new WeakMap<Stub, number>();
+  };
+
+  return resolve;
 }
 
 function resolveSequenceStep(
@@ -49,24 +57,26 @@ function resolveSequenceStep(
   }
 
   const cursor = cursors.get(stub) ?? 0;
-  if (cursor >= sequence.length) {
-    const exhausted = stub.onSequenceExhausted ?? "error";
-    if (exhausted === "passthrough") return undefined;
-    if (exhausted === "error") {
-      return {
-        produce: () => {
-          throw new Error(`mockist: sequence stub "${stub.name}" exhausted after ${sequence.length} calls`);
-        },
-      };
-    }
+  if (cursor >= sequence.length && (stub.onSequenceExhausted ?? "error") === "passthrough") {
+    return undefined;
   }
-
-  const index = Math.min(cursor, sequence.length - 1);
-  cursors.set(stub, cursor + 1);
-  const step = sequence[index]!;
 
   return {
     produce: () => {
+      const cur = cursors.get(stub) ?? 0;
+      if (cur >= sequence.length) {
+        const exhausted = stub.onSequenceExhausted ?? "error";
+        if (exhausted === "error") {
+          throw new Error(`mockist: sequence stub "${stub.name}" exhausted after ${sequence.length} calls`);
+        }
+        const step = sequence[sequence.length - 1]!;
+        cursors.set(stub, cur + 1);
+        if ("error" in step) throw step.error;
+        return produceResult(step.result, input);
+      }
+
+      const step = sequence[cur]!;
+      cursors.set(stub, cur + 1);
       if ("error" in step) throw step.error;
       return produceResult(step.result, input);
     },

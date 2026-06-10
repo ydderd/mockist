@@ -45,6 +45,19 @@ test("kind must match (default kind is tool); first match wins", () => {
   expect(resolve({ kind: "skill", name: "x", input: { a: 1 } })).toBeUndefined();
 });
 
+test("sequence stubs do not advance until produce() runs", () => {
+  const resolve = predicateResolver(defineStubs([
+    { name: "retry", sequence: [{ result: "first" }, { result: "second" }] },
+  ]));
+
+  const first = resolve({ kind: "tool", name: "retry", input: {} });
+  const second = resolve({ kind: "tool", name: "retry", input: {} });
+  expect(first).toBeDefined();
+  expect(second).toBeDefined();
+  expect(first?.produce()).toBe("first");
+  expect(second?.produce()).toBe("second");
+});
+
 test("sequence stubs consume one step per matching call", () => {
   const resolve = predicateResolver(defineStubs([
     {
