@@ -1,5 +1,5 @@
-import type { Call, CallKind, Resolver, Stub, UnhandledPolicy } from "./types";
-import { predicateResolver } from "./registry";
+import type { Call, CallKind, Resolver, SequenceStubState, Stub, UnhandledPolicy } from "./types";
+import { predicateResolver, type ResettableResolver } from "./registry";
 import { Recorder, type Redactor } from "./recorder";
 import { deepEqual } from "./deep-equal";
 import { identify } from "./identity";
@@ -20,9 +20,11 @@ export class Harness {
   private readonly recorder: Recorder;
   private readonly onUnhandled: UnhandledPolicy;
   private readonly resetResolvers: Array<() => void>;
+  private readonly stubResolver: ResettableResolver;
 
   constructor(opts: HarnessOptions = {}) {
     const stubResolver = predicateResolver(opts.stubs ?? []);
+    this.stubResolver = stubResolver;
     this.resetResolvers = [stubResolver.reset];
     this.resolvers = [stubResolver, ...(opts.resolvers ?? [])];
     this.recorder = new Recorder(opts.redact);
@@ -39,6 +41,11 @@ export class Harness {
 
   calledWith(name: string, input: unknown): boolean {
     return this.trajectory.some((c) => c.name === name && deepEqual(c.input, input));
+  }
+
+  /** Consumption/exhaustion state of each sequence stub — for "no exhausted sequences" assertions. */
+  sequenceState(): SequenceStubState[] {
+    return this.stubResolver.sequenceState();
   }
 
   reset(): void {
@@ -58,9 +65,16 @@ export class Harness {
   ): Promise<unknown> {
     const key = identify(kind, name, input);
 
+    // A matched stub may explicitly defer to the real tool (exhausted passthrough sequence);
+    // that delegation must bypass the onUnhandled policy below.
+    let deferToOriginal = false;
     for (const resolve of this.resolvers) {
       const hit = resolve({ kind, name, input });
       if (!hit) continue;
+      if (hit.passthrough) {
+        deferToOriginal = true;
+        break;
+      }
       try {
         const output = await hit.produce();
         this.push(kind, name, input, key, { stubbed: true, output });
@@ -71,12 +85,12 @@ export class Harness {
       }
     }
 
-    if (this.onUnhandled === "error") {
+    if (!deferToOriginal && this.onUnhandled === "error") {
       const error = new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
       this.push(kind, name, input, key, { stubbed: false, error });
       throw error;
     }
-    if (this.onUnhandled === "warn") {
+    if (!deferToOriginal && this.onUnhandled === "warn") {
       console.warn(`mockist: unhandled ${kind} call "${name}" — passing through`);
     }
 

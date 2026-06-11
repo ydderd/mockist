@@ -7,6 +7,9 @@ export function stableStringify(value: unknown): string {
   // args matching and call identity don't conflate them with null or each other.
   if (value === undefined) return "undefined";
   if (typeof value === "number" && Number.isNaN(value)) return "NaN";
+  if (value instanceof Error) {
+    return `Error:${JSON.stringify({ name: value.name, message: value.message })}`;
+  }
   if (value === null || typeof value !== "object") {
     return JSON.stringify(value) ?? "null";
   }

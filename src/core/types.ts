@@ -57,9 +57,27 @@ export type Stub = BaseStub & (
  */
 export interface Resolution {
   produce: () => unknown | Promise<unknown>;
+  /**
+   * When true, the call matched a stub that defers to the real tool (a sequence stub
+   * exhausted under `onSequenceExhausted: "passthrough"`). The harness runs `original`
+   * directly, bypassing the `onUnhandled` policy. `produce` is never invoked in this case.
+   */
+  passthrough?: boolean;
 }
 export type ResolverInput = Pick<Call, "kind" | "name" | "input">;
 export type Resolver = (call: ResolverInput) => Resolution | undefined;
 
 /** What to do when no resolver matches a call. */
 export type UnhandledPolicy = "passthrough" | "warn" | "error";
+
+/** Public, queryable consumption state of one sequence stub. */
+export interface SequenceStubState {
+  name: string;
+  kind: CallKind;
+  /** total steps defined on the sequence. */
+  length: number;
+  /** distinct steps consumed so far (capped at `length`). */
+  consumed: number;
+  /** true once a matching call arrived after every step was consumed (ran dry). */
+  exhausted: boolean;
+}

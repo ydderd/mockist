@@ -17,6 +17,11 @@ test("stableStringify sorts nested keys and handles arrays/null", () => {
   expect(stableStringify(null)).toBe("null");
 });
 
+test("stableStringify distinguishes Error instances by name and message", () => {
+  expect(stableStringify(new Error("503"))).not.toBe(stableStringify(new Error("404")));
+  expect(stableStringify(new Error("same"))).toBe(stableStringify(new Error("same")));
+});
+
 test("stableStringify distinguishes null, undefined, and NaN", () => {
   expect(stableStringify(undefined)).not.toBe(stableStringify(null));
   expect(stableStringify(NaN)).not.toBe(stableStringify(null));

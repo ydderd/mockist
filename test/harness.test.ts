@@ -70,6 +70,49 @@ test("an exhausted sequence can pass through to original", async () => {
   expect(harness.trajectory[1]).toMatchObject({ name: "eventually-real", stubbed: false });
 });
 
+test("an exhausted passthrough sequence runs original even when onUnhandled is 'error'", async () => {
+  const harness = createHarness({
+    onUnhandled: "error",
+    stubs: [{
+      name: "eventually-real",
+      sequence: [{ result: "stubbed" }],
+      onSequenceExhausted: "passthrough",
+    }],
+  });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "eventually-real", {}, original)).resolves.toBe("stubbed");
+  // The call matched a stub whose passthrough mode means "defer to the real tool" — the
+  // global onUnhandled:'error' policy must not hijack it into an unhandled-call throw.
+  await expect(harness.dispatch("tool", "eventually-real", {}, original)).resolves.toBe("real");
+
+  expect(original).toHaveBeenCalledTimes(1);
+  expect(harness.trajectory[1]).toMatchObject({ name: "eventually-real", stubbed: false, output: "real" });
+});
+
+test("a stub defining neither result nor sequence records a stubbed failure", async () => {
+  // @ts-expect-error — intentionally malformed stub: no result, no sequence.
+  const harness = createHarness({ stubs: [{ name: "bad" }] });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "bad", { a: 1 }, original)).rejects.toThrow(/must define result or sequence/);
+  expect(original).not.toHaveBeenCalled();
+  expect(harness.trajectory).toHaveLength(1);
+  expect(harness.trajectory[0]).toMatchObject({ name: "bad", input: { a: 1 }, stubbed: true });
+  expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
+});
+
+test("an empty sequence stub records a stubbed failure", async () => {
+  const harness = createHarness({ stubs: [{ name: "empty", sequence: [] }] });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "empty", {}, original)).rejects.toThrow(/at least one step/);
+  expect(original).not.toHaveBeenCalled();
+  expect(harness.trajectory).toHaveLength(1);
+  expect(harness.trajectory[0]).toMatchObject({ name: "empty", stubbed: true });
+  expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
+});
+
 test("errors from original (pass-through) are recorded and rethrown", async () => {
   const harness = createHarness();
   await expect(harness.dispatch("tool", "x", {}, async () => { throw new Error("boom"); })).rejects.toThrow("boom");
@@ -122,6 +165,37 @@ test("reset clears the trajectory", async () => {
   await harness.dispatch("tool", "x", {}, async () => 1);
   harness.reset();
   expect(harness.trajectory).toHaveLength(0);
+});
+
+test("sequenceState reports consumption and exhaustion of sequence stubs", async () => {
+  const harness = createHarness({
+    stubs: [
+      { name: "flaky", sequence: [{ result: "a" }, { result: "b" }], onSequenceExhausted: "repeat-last" },
+      { name: "plain", result: 1 },
+    ],
+  });
+  const original = vi.fn(async () => "real");
+
+  // Nothing consumed yet.
+  expect(harness.sequenceState()).toEqual([
+    { name: "flaky", kind: "tool", length: 2, consumed: 0, exhausted: false },
+  ]);
+
+  await harness.dispatch("tool", "flaky", {}, original);
+  await harness.dispatch("tool", "flaky", {}, original);
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 2, exhausted: false });
+
+  // One more matching call drains it.
+  await harness.dispatch("tool", "flaky", {}, original);
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 2, exhausted: true });
+});
+
+test("sequenceState resets with the harness", async () => {
+  const harness = createHarness({ stubs: [{ name: "once", sequence: [{ result: "only" }] }] });
+  await harness.dispatch("tool", "once", {}, async () => "real");
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 1 });
+  harness.reset();
+  expect(harness.sequenceState()[0]).toMatchObject({ consumed: 0, exhausted: false });
 });
 
 test("reset rewinds sequence stub cursors", async () => {

@@ -1,6 +1,29 @@
 {
   "name": "mockist",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Stub the tool calls your agent makes through the Vercel AI SDK — return canned values or errors, then assert the recorded call trajectory.",
+  "license": "Elastic-2.0",
+  "author": "Dhanvi Reddy",
+  "homepage": "https://github.com/ydderd/mockist#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ydderd/mockist.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ydderd/mockist/issues"
+  },
+  "keywords": [
+    "ai",
+    "vercel-ai-sdk",
+    "agent",
+    "tools",
+    "tool-calling",
+    "testing",
+    "mock",
+    "stub",
+    "trajectory",
+    "llm"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
