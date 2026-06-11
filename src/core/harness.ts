@@ -65,9 +65,16 @@ export class Harness {
   ): Promise<unknown> {
     const key = identify(kind, name, input);
 
+    // A matched stub may explicitly defer to the real tool (exhausted passthrough sequence);
+    // that delegation must bypass the onUnhandled policy below.
+    let deferToOriginal = false;
     for (const resolve of this.resolvers) {
       const hit = resolve({ kind, name, input });
       if (!hit) continue;
+      if (hit.passthrough) {
+        deferToOriginal = true;
+        break;
+      }
       try {
         const output = await hit.produce();
         this.push(kind, name, input, key, { stubbed: true, output });
@@ -78,12 +85,12 @@ export class Harness {
       }
     }
 
-    if (this.onUnhandled === "error") {
+    if (!deferToOriginal && this.onUnhandled === "error") {
       const error = new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
       this.push(kind, name, input, key, { stubbed: false, error });
       throw error;
     }
-    if (this.onUnhandled === "warn") {
+    if (!deferToOriginal && this.onUnhandled === "warn") {
       console.warn(`mockist: unhandled ${kind} call "${name}" — passing through`);
     }
 

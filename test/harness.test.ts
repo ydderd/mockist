@@ -70,6 +70,49 @@ test("an exhausted sequence can pass through to original", async () => {
   expect(harness.trajectory[1]).toMatchObject({ name: "eventually-real", stubbed: false });
 });
 
+test("an exhausted passthrough sequence runs original even when onUnhandled is 'error'", async () => {
+  const harness = createHarness({
+    onUnhandled: "error",
+    stubs: [{
+      name: "eventually-real",
+      sequence: [{ result: "stubbed" }],
+      onSequenceExhausted: "passthrough",
+    }],
+  });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "eventually-real", {}, original)).resolves.toBe("stubbed");
+  // The call matched a stub whose passthrough mode means "defer to the real tool" — the
+  // global onUnhandled:'error' policy must not hijack it into an unhandled-call throw.
+  await expect(harness.dispatch("tool", "eventually-real", {}, original)).resolves.toBe("real");
+
+  expect(original).toHaveBeenCalledTimes(1);
+  expect(harness.trajectory[1]).toMatchObject({ name: "eventually-real", stubbed: false, output: "real" });
+});
+
+test("a stub defining neither result nor sequence records a stubbed failure", async () => {
+  // @ts-expect-error — intentionally malformed stub: no result, no sequence.
+  const harness = createHarness({ stubs: [{ name: "bad" }] });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "bad", { a: 1 }, original)).rejects.toThrow(/must define result or sequence/);
+  expect(original).not.toHaveBeenCalled();
+  expect(harness.trajectory).toHaveLength(1);
+  expect(harness.trajectory[0]).toMatchObject({ name: "bad", input: { a: 1 }, stubbed: true });
+  expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
+});
+
+test("an empty sequence stub records a stubbed failure", async () => {
+  const harness = createHarness({ stubs: [{ name: "empty", sequence: [] }] });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "empty", {}, original)).rejects.toThrow(/at least one step/);
+  expect(original).not.toHaveBeenCalled();
+  expect(harness.trajectory).toHaveLength(1);
+  expect(harness.trajectory[0]).toMatchObject({ name: "empty", stubbed: true });
+  expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
+});
+
 test("errors from original (pass-through) are recorded and rethrown", async () => {
   const harness = createHarness();
   await expect(harness.dispatch("tool", "x", {}, async () => { throw new Error("boom"); })).rejects.toThrow("boom");

@@ -65,6 +65,10 @@ const harness = createHarness({
 });
 ```
 
+`"passthrough"` runs the real tool once the sequence is spent — and because the
+call *matched* a stub, it defers to that tool even under `onUnhandled: "error"`
+(the policy governs *un-stubbed* calls, not deliberate passthrough).
+
 ## Assertions
 
 `harness.trajectory` is a typed, read-only array of every call (`name`, `input`,
@@ -243,3 +247,11 @@ the assertion helpers above); and MCP / Anthropic / OpenAI adapters. Source of t
 and ordering:
 [`docs/BACKLOG.md`](docs/BACKLOG.md) (design spec:
 `docs/superpowers/specs/2026-06-06-declarative-tool-stub-harness-design.md`).
+
+## License
+
+[Elastic License 2.0](LICENSE) — source-available. You may use, copy, modify, and
+redistribute mockist freely, **including inside commercial software**, with three
+limits: you may not offer it to third parties as a hosted or managed service, you
+may not circumvent license-key functionality, and you may not remove licensing
+notices. See [LICENSE](LICENSE) for the full terms.
