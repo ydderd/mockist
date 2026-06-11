@@ -100,11 +100,15 @@ test("sequence stubs can repeat the last step when exhausted", () => {
   expect(resolve({ kind: "tool", name: "repeat", input: {} })?.produce()).toBe("last");
 });
 
-test("sequence stubs can pass through when exhausted", () => {
+test("sequence stubs signal passthrough (not a miss) when exhausted", () => {
   const resolve = predicateResolver(defineStubs([
     { name: "fallthrough", sequence: [{ result: "stubbed" }], onSequenceExhausted: "passthrough" },
   ]));
 
   expect(resolve({ kind: "tool", name: "fallthrough", input: {} })?.produce()).toBe("stubbed");
-  expect(resolve({ kind: "tool", name: "fallthrough", input: {} })).toBeUndefined();
+  // A matched-but-exhausted passthrough stub is distinct from a non-match (undefined): it
+  // carries `passthrough` so the harness defers to the real tool regardless of onUnhandled.
+  const exhausted = resolve({ kind: "tool", name: "fallthrough", input: {} });
+  expect(exhausted).toBeDefined();
+  expect(exhausted?.passthrough).toBe(true);
 });

@@ -65,6 +65,10 @@ const harness = createHarness({
 });
 ```
 
+`"passthrough"` runs the real tool once the sequence is spent — and because the
+call *matched* a stub, it defers to that tool even under `onUnhandled: "error"`
+(the policy governs *un-stubbed* calls, not deliberate passthrough).
+
 ## Assertions
 
 `harness.trajectory` is a typed, read-only array of every call (`name`, `input`,
