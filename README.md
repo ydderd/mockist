@@ -69,9 +69,56 @@ const harness = createHarness({
 
 `harness.trajectory` is a typed, read-only array of every call (`name`, `input`,
 `output`/`error`, `stubbed`). Helpers: `harness.callsTo(name)`,
-`harness.calledWith(name, input)`. Use your runner's own assertions. Call
-`harness.reset()` between tests (clears trajectory and sequence cursors; the stub
-list is fixed at `createHarness` time).
+`harness.calledWith(name, input)`. Call `harness.reset()` between tests (clears
+trajectory and sequence cursors; the stub list is fixed at `createHarness` time).
+
+### Trajectory assertion helpers
+
+For readable expectations with diffable failure output, mockist ships a small,
+**runner-agnostic** assertion layer over the trajectory. Each helper is a pure
+function that returns `{ pass, message() }` — it never throws and never imports a
+test framework, so it works under any runner (Vitest/Jest matchers will wrap it
+later). `message()` renders an expected-vs-actual diff showing each call's `name`,
+`input`, `output`/`error`, and `stubbed` status.
+
+```ts
+import {
+  expectExactTrajectory,    // full trajectory, in order (same length, every position matches)
+  expectSubsequence,        // expected calls appear in order; gaps allowed
+  expectCalledTool,         // at least one call to a tool name
+  expectCalledWith,         // a call to a tool whose input is a deep-superset of a partial
+  expectNoUnhandledCalls,   // nothing hit the onUnhandled policy (everything was stubbed)
+  expectNoPassthroughCalls, // nothing ran the real tool (same guarantee, "stubbed" framing)
+  expectNoExhaustedSequences,
+} from "mockist";
+
+const { pass, message } = expectSubsequence(harness.trajectory, [
+  { name: "get_weather", input: { city: "Paris" }, stubbed: true },
+  { name: "search" }, // name-only; output/error/stubbed optional
+]);
+if (!pass) throw new Error(message()); // or: expect(pass, message()).toBe(true)
+```
+
+Each expected call spec needs only `name`; provide `input`/`output`/`error`/
+`stubbed`/`kind` to tighten the match. In `expectExactTrajectory` and
+`expectSubsequence`, every *specified* field must deep-equal the recorded call.
+`expectCalledWith` matches on a **deep-subset** of the input (extra fields ignored).
+
+> `expectNoUnhandledCalls` and `expectNoPassthroughCalls` check the same bit
+> (`stubbed === false`) — two framings of the same guarantee. Use whichever reads
+> better for your `onUnhandled` mode (catch leaks to real tools, or assert full
+> stub coverage).
+
+### Sequence exhaustion
+
+`harness.sequenceState()` returns the consumption state of every `sequence` stub —
+`{ name, kind, length, consumed, exhausted }`. A sequence is `exhausted` once a
+matching call arrives after all its steps were consumed (it ran dry). Assert that
+no sequence was under-provisioned:
+
+```ts
+const { pass, message } = expectNoExhaustedSequences(harness.sequenceState());
+```
 
 ## Layered stub registries
 
@@ -189,10 +236,10 @@ already-matching suite stub. For defaults + overrides, merge stub arrays; reserv
 
 ## Not yet (backlog)
 
-Next up: **trajectory assertion helpers + readable diffs** (today you inspect
-`harness.trajectory` and use your runner's own assertions). Then: record → replay
-fixtures; dependency replay inside `execute` (fetch first, then Prisma/DB/queue — the
-moat); sub-agent / whole-workflow trajectory composition; schema-grounded stubs; and
-MCP / Anthropic / OpenAI adapters. Source of truth and ordering:
+Next up: **record → replay fixtures**; dependency replay inside `execute` (fetch
+first, then Prisma/DB/queue — the moat); sub-agent / whole-workflow trajectory
+composition; schema-grounded stubs; runner integrations (Vitest/Jest matchers wrapping
+the assertion helpers above); and MCP / Anthropic / OpenAI adapters. Source of truth
+and ordering:
 [`docs/BACKLOG.md`](docs/BACKLOG.md) (design spec:
 `docs/superpowers/specs/2026-06-06-declarative-tool-stub-harness-design.md`).
