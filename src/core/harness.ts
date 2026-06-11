@@ -19,9 +19,12 @@ export class Harness {
   readonly resolvers: Resolver[];
   private readonly recorder: Recorder;
   private readonly onUnhandled: UnhandledPolicy;
+  private readonly resetResolvers: Array<() => void>;
 
   constructor(opts: HarnessOptions = {}) {
-    this.resolvers = [predicateResolver(opts.stubs ?? []), ...(opts.resolvers ?? [])];
+    const stubResolver = predicateResolver(opts.stubs ?? []);
+    this.resetResolvers = [stubResolver.reset];
+    this.resolvers = [stubResolver, ...(opts.resolvers ?? [])];
     this.recorder = new Recorder(opts.redact);
     this.onUnhandled = opts.onUnhandled ?? "passthrough";
   }
@@ -40,6 +43,7 @@ export class Harness {
 
   reset(): void {
     this.recorder.reset();
+    for (const reset of this.resetResolvers) reset();
   }
 
   /**

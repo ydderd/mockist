@@ -33,6 +33,43 @@ test("a throwing stub is recorded as a stubbed failure and rethrown", async () =
   expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
 });
 
+test("a sequence stub records retry-style failure then success", async () => {
+  const harness = createHarness({
+    stubs: [{
+      name: "flaky",
+      sequence: [{ error: new Error("503") }, { result: "ok" }],
+    }],
+  });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "flaky", {}, original)).rejects.toThrow("503");
+  await expect(harness.dispatch("tool", "flaky", {}, original)).resolves.toBe("ok");
+
+  expect(original).not.toHaveBeenCalled();
+  expect(harness.trajectory).toHaveLength(2);
+  expect(harness.trajectory[0]).toMatchObject({ name: "flaky", stubbed: true });
+  expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
+  expect(harness.trajectory[1]).toMatchObject({ name: "flaky", stubbed: true, output: "ok" });
+});
+
+test("an exhausted sequence can pass through to original", async () => {
+  const harness = createHarness({
+    stubs: [{
+      name: "eventually-real",
+      sequence: [{ result: "stubbed" }],
+      onSequenceExhausted: "passthrough",
+    }],
+  });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "eventually-real", {}, original)).resolves.toBe("stubbed");
+  await expect(harness.dispatch("tool", "eventually-real", {}, original)).resolves.toBe("real");
+
+  expect(original).toHaveBeenCalledTimes(1);
+  expect(harness.trajectory[0]).toMatchObject({ name: "eventually-real", stubbed: true });
+  expect(harness.trajectory[1]).toMatchObject({ name: "eventually-real", stubbed: false });
+});
+
 test("errors from original (pass-through) are recorded and rethrown", async () => {
   const harness = createHarness();
   await expect(harness.dispatch("tool", "x", {}, async () => { throw new Error("boom"); })).rejects.toThrow("boom");
@@ -85,4 +122,22 @@ test("reset clears the trajectory", async () => {
   await harness.dispatch("tool", "x", {}, async () => 1);
   harness.reset();
   expect(harness.trajectory).toHaveLength(0);
+});
+
+test("reset rewinds sequence stub cursors", async () => {
+  const harness = createHarness({
+    stubs: [{
+      name: "flaky",
+      sequence: [{ error: new Error("503") }, { result: "ok" }],
+    }],
+  });
+  const original = vi.fn(async () => "real");
+
+  await expect(harness.dispatch("tool", "flaky", {}, original)).rejects.toThrow("503");
+  await expect(harness.dispatch("tool", "flaky", {}, original)).resolves.toBe("ok");
+
+  harness.reset();
+
+  await expect(harness.dispatch("tool", "flaky", {}, original)).rejects.toThrow("503");
+  await expect(harness.dispatch("tool", "flaky", {}, original)).resolves.toBe("ok");
 });

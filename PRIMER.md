@@ -1,8 +1,13 @@
 # mockist — Primer
 
-> A test harness for agent **tools and skills**: capture real tool calls, replay them deterministically (dependencies and all), and assert on them — derived from the tool definitions you already wrote, with near-zero added effort.
+> A test harness for agent **tools and skills**: stub or replay tool calls at clear
+> boundaries, record trajectories, and assert on what the agent did — derived from
+> the tool definitions you already wrote, with near-zero added effort.
 
-**Status:** idea / pre-MVP. This doc is the why + framing. Build plan is in [OUTLINE.md](./OUTLINE.md).
+**Status:** **MVP shipped** for tier-2 **tool-boundary** stubbing (`wrapVercelTools`,
+`createHarness`, trajectory assertions). **Record → replay** and **dependency replay
+inside `execute`** are backlog (the long-term moat). Usage: [README.md](./README.md).
+Roadmap, gates & findings: [`docs/BACKLOG.md`](./docs/BACKLOG.md).
 
 ---
 
@@ -43,22 +48,89 @@ behavior := from recorded real runs (args, model choice, dependency I/O, result)
 tests    := promoted from those recordings, not hand-written
 ```
 
-The loop is **record → replay → assert**. Zero spec language, zero maintenance tax.
+The long-term loop is **record → replay → assert**. Today's MVP uses **hand-authored
+stubs** at the tool boundary (no spec language); record → fixture generation is backlog.
 
 ---
 
 ## What it is / what it isn't
 
-**Is:** "VCR + Pact, for agent tool calls." Instrument once, see every tool call, freeze any real one into a deterministic replayable test that stubs the tool's dependencies.
+**Is (shipped):** a thin wrapper around your SDK tools — stub whole `execute` calls,
+record every call in order, assert trajectories. Two lines: `createHarness` +
+`wrapVercelTools`. Suite-wide defaults and per-test overrides via merged stub lists
+(see README — **layered stub registries**).
+
+**Is (planned):** "VCR + Pact, for agent tool calls" at the **dependency seam inside
+`execute`** — record DB/HTTP/MCP I/O, replay deterministically. Complements boundary
+stubbing; does not replace hand-mocked unit tests of tool internals.
 
 **Isn't:** a new spec format; another generic LLM-eval/trace dashboard; an MCP-only thing.
 
 ### Three test tiers (you opt into depth)
-1. **Tool-as-code** — given args, does `execute()` do the right thing + the right side effects? (replay with mocked deps)
-2. **Tool-under-agent** — given a prompt + this tool, does the *model* call it, with valid args, and recover from errors? (trajectory assertion; the part nobody tests)
-3. **MCP-as-contract** — does the server expose the tools/schemas it claims and behave per recorded scenarios?
+1. **Tool-as-code** — given args, does `execute()` do the right thing + the right side effects? (dependency replay inside `execute` — **backlog / moat**)
+2. **Tool-under-agent** — given a prompt + tools, does the *model* call the right tools, with valid args, and recover from errors? (trajectory assertion — **shipped** via boundary stubs + `harness.trajectory`)
+3. **MCP-as-contract** — does the server expose the tools/schemas it claims and behave per recorded scenarios? (**future adapter**)
 
-The **differentiated, hard, valuable** core is tier 1's **dependency replay** — recording and deterministically re-injecting the DB/HTTP/other-MCP I/O a tool performs. The eval vendors don't do this; it's exactly what hand-mocks get wrong.
+**Shipped first:** tier 2 — fast, no dependency mocking, validated in the Synapse dogfood
+(see the findings log in [`docs/BACKLOG.md`](./docs/BACKLOG.md)). **Differentiated
+long-term:** tier 1 dependency replay — what catches the origin-story bugs boundary
+stubbing cannot see.
+
+---
+
+## How it works
+
+**Shipped (M0 — boundary stub harness):**
+
+```
+  your code │  tools = wrapVercelTools(myTools, harness)     ← 2-line opt-in
+            │  harness = createHarness({ stubs: mergeStubs(test, suite) })
+            └───────────────┬─────────────────────────────┘
+                            │ every execute() call
+                ┌───────────▼───────────┐
+                │  Harness.dispatch      │  stub match → canned result / throw
+                │  - predicateResolver   │  miss → pass-through / warn / error
+                │  - recorder (trajectory)│
+                └────────────────────────┘
+```
+
+**Planned (record + dependency replay):**
+
+```
+                ┌───────────▼───────────┐      ┌──────────────────────┐
+                │  Interceptor           │─────▶│ Recorder (JSONL sink) │  record mode
+                │  - wraps execute()     │      └──────────────────────┘
+                │  - wraps dep clients   │◀─────┐
+                └───────────┬───────────┘      │ Replayer (fixture source)  replay mode
+                            │                   └──────────────────────┘
+                ┌───────────▼───────────┐
+                │  Adapters (ingest)     │  vercel-ai · mcp · openai · anthropic
+                └────────────────────────┘
+                ┌────────────────────────┐
+                │  Runner / assert / diff │  CLI + vitest/jest matchers
+                └────────────────────────┘
+```
+
+- **M0 adapter:** `wrapVercelTools` — Vercel AI SDK only; tools are `execute`-wrapped objects.
+- **Future adapters** normalize each SDK's tool list; dependency clients wrapped for record/replay.
+- **Test ergonomics:** layered stub registries (README) — project-level `mergeStubs` helpers;
+  mockist stays runner-agnostic.
+
+### Core model
+
+Three concepts, nothing more:
+
+- **Tool** — ingested, never authored. From a Vercel AI SDK `tool()`, an MCP `tools/list` entry, or an OpenAI/Anthropic tool def. Gives us `name`, `description`, input/output JSON-Schema.
+- **Recording** — one captured invocation: `{ tool, args, modelChoice?, dependencyCalls: [{key, request, response|error}], result|error, ts, meta(model, repo, sha) }`. JSONL on disk; uploadable later.
+- **Scenario** — a named test derived from one or more recordings: `given` (the dependency responses to inject) → `when` (called-with-args, or agent-given-prompt) → `then` (assert output / tool-call trajectory / observed side-effect calls). Generated from recordings; hand-editable.
+
+The long-term loop: **record → promote to scenario → replay → assert/diff.** M0 uses
+hand-authored boundary stubs instead of recorded fixtures.
+
+The hard primitive (backlog): a **dependency seam** inside `execute` — a keyed,
+interceptable boundary for DB/HTTP/MCP I/O. Recording captures `(key, request) →
+response`; replay injects the recorded response instead of hitting the real dependency.
+M0 stubs the whole `execute` at the SDK tool boundary (complementary, not a substitute).
 
 ---
 
@@ -66,19 +138,27 @@ The **differentiated, hard, valuable** core is tier 1's **dependency replay** �
 
 The free, solo-dev rung must stand alone and be *relief, not ceremony*:
 
-1. **`wrapTools()` skill / SDK wrapper** (free, local) — one line; now you can *see* every tool call your agent made.
-2. **Record → fixtures** — freeze any real call (args + dependency responses + outcome) to a file.
-3. **`replay` in tests / CI / a GitHub Action** — deterministic re-run + diff; reproducible.
-4. **Hosted run-suites** — audit trails, cross-model diffing (run the same suite on Sonnet 4.6 vs 4.8 vs GPT), team gates, dashboards.
+1. **`wrapVercelTools()` + `createHarness()`** (free, local, **shipped**) — stub tool
+   boundaries, see every call, assert trajectories. Layered suite/test stub registries
+   need no extra API (merge stub arrays; first match wins).
+2. **Record → fixtures** — freeze real calls (args + dependency responses + outcome) to
+   a file. **Backlog.**
+3. **`replay` in tests / CI / a GitHub Action** — deterministic re-run + diff. **Backlog**
+   (depends on rung 2).
+4. **Hosted run-suites** — audit trails, cross-model diffing, team gates, dashboards.
+   **Future platform.**
 
-Each rung adds reproducibility/auditability; rungs 3–4 are where a platform/PLG business lives. Rung 1 is the adoption hook and must be genuinely useful with no account.
+Rung 1 is the adoption hook and must be genuinely useful with no account — Synapse
+dogfood verdict: **relief, not ceremony** for agent trajectory tests.
 
 ---
 
 ## Honest risks (decide before investing)
 
 1. **The deterministic half is low-value** — SDKs already validate args against the schema; MCP is typed. Don't sell schema-checking.
-2. **The non-deterministic half is crowded** — tier 2 overlaps LangSmith/Braintrust/Langfuse/Promptfoo/Arize. If that's the whole pitch, you're a feature on their roadmap.
+2. **The non-deterministic half is crowded** — tier-2 trajectory tooling overlaps
+   LangSmith/Braintrust/Langfuse/Promptfoo/Arize. M0 ships there as the free wedge; the
+   pitch can't stop at trajectory-only if we want a moat.
 3. **Dependency replay is the moat and the hard part** — capturing/replaying arbitrary DB/HTTP/MCP I/O deterministically is real engineering.
 4. **Friction is binary** — if instrumentation isn't truly one line per SDK, it's dead.
 5. **User ≠ buyer** — solo dev adopts free; the team needing CI gates/audit pays. The free tier must be painfully useful first.
@@ -89,7 +169,13 @@ Each rung adds reproducibility/auditability; rungs 3–4 are where a platform/PL
 
 There's probably something — but the sharp version is **"zero-spec VCR + contract tests for agent tool calls, derived from your SDK tools and real runs, anchored on dependency replay."** Not a spec DSL, not another eval dashboard.
 
-**Cheapest honest test of the thesis (one weekend):** build the Vercel-AI-SDK `wrapTools()` recorder + `replay()` (inject recorded dependency responses, re-run the tool, diff), point it at a real repo's skills (the Synapse email skills are a ready-made fixture set), and see if it *obviously* beats hand-mocks. If it feels like relief, build on. If it feels like ceremony, kill it.
+**Gate (2026-06-08):** boundary stub harness on the Vercel AI SDK — **continue**. Agent
+trajectory + stubbed tool-error injection (a stubbed tool throws; the error is recorded on
+the trajectory) on Synapse's real `createWorkflowTools` path with zero `vi.mock` of
+prisma/queue. (The dogfood drove a scripted model, so this validates error *recording*, not
+the model genuinely *deciding* to recover after seeing an error.) **Next gate for the original thesis:** dependency replay
+inside `execute` on the Synapse email skills — inject recorded HTTP/DB responses, re-run
+the tool, diff; see if it beats hand-mocks on the origin-story bugs.
 
 ---
 

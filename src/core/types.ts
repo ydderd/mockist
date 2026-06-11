@@ -19,8 +19,13 @@ export type StubResult =
   | unknown
   | ((input: any) => unknown | Promise<unknown>);
 
-/** A declarative stub. Matches on name + (predicate | args | name-only). */
-export interface Stub {
+export type SequenceExhaustion = "error" | "repeat-last" | "passthrough";
+
+export type StubSequenceStep =
+  | { result: StubResult; error?: never }
+  | { error: unknown; result?: never };
+
+interface BaseStub {
   /** defaults to "tool". */
   kind?: CallKind;
   name: string;
@@ -28,8 +33,22 @@ export interface Stub {
   args?: unknown;
   /** predicate match; takes precedence over `args` when present. */
   match?: (input: any) => boolean;
-  result: StubResult;
 }
+
+/** A declarative stub. Matches on name + (predicate | args | name-only). */
+export type Stub = BaseStub & (
+  | {
+      result: StubResult;
+      sequence?: never;
+      onSequenceExhausted?: never;
+    }
+  | {
+  /** Ordered results/errors for repeated matching calls. Takes precedence over `result`. */
+      sequence: StubSequenceStep[];
+  /** What to do when a sequence has no unused step left. Default "error". */
+      onSequenceExhausted?: SequenceExhaustion;
+    }
+);
 
 /**
  * A resolver returns a Resolution on a hit, or undefined to defer to the next resolver.
