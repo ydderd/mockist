@@ -88,6 +88,26 @@ test("exact trajectory renders error outcomes", () => {
   expect(msg).toContain("503");
 });
 
+test("exact trajectory matches error message and fails when it differs", () => {
+  const traj = [call({ name: "flaky", input: {}, error: new Error("503"), stubbed: true })];
+  expect(
+    expectExactTrajectory(traj, [{ name: "flaky", error: new Error("503") }]).pass,
+  ).toBe(true);
+  const mismatch = expectExactTrajectory(traj, [{ name: "flaky", error: new Error("404") }]);
+  expect(mismatch.pass).toBe(false);
+  expect(mismatch.message()).toContain("503");
+  expect(mismatch.message()).toContain("404");
+});
+
+test("subsequence matches error message and fails when it differs", () => {
+  const traj = [call({ name: "flaky", input: {}, error: new Error("503"), stubbed: true })];
+  expect(
+    expectSubsequence(traj, [{ name: "flaky", error: new Error("503") }]).pass,
+  ).toBe(true);
+  const mismatch = expectSubsequence(traj, [{ name: "flaky", error: new Error("404") }]);
+  expect(mismatch.pass).toBe(false);
+});
+
 // ---------------------------------------------------------------------------
 // expectSubsequence
 // ---------------------------------------------------------------------------
