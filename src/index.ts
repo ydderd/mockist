@@ -12,12 +12,21 @@ export {
   expectNoUnhandledCalls,
   expectNoPassthroughCalls,
   expectNoExhaustedSequences,
+  expectCassetteFullyUsed,
+  cassetteExpectedCalls,
   type AssertionResult,
   type ExpectedCall,
 } from "./core/assert";
+export { defaultRedactor, isRedacted, redactionSentinel, SECRET_KEYS } from "./core/cassette/redact";
+export { CASSETTE_FORMAT_VERSION } from "./core/cassette/format";
+export { flushPendingSaves } from "./core/cassette/registry";
 export type {
   Call,
   CallKind,
+  CassetteState,
+  MatchDirective,
+  RecordedEntry,
+  RecordedError,
   Resolution,
   Resolver,
   ResolverInput,

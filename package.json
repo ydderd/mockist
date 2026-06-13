@@ -32,12 +32,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./vitest-setup": {
+      "types": "./dist/setup/vitest.d.ts",
+      "import": "./dist/setup/vitest.js"
+    },
+    "./jest-setup": {
+      "types": "./dist/setup/jest.d.ts",
+      "import": "./dist/setup/jest.js"
     }
   },
   "bin": {
     "mockist": "./dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup",
@@ -51,6 +61,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@jest/globals": "^30.4.1",
     "@types/node": "^25.9.2",
     "ai": "^6.0.197",
     "tsup": "^8.5.1",

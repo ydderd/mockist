@@ -13,3 +13,10 @@ test("composes end to end", async () => {
   const wrapped = mockist.wrapVercelTools({ ping: { execute: async () => "real" } }, harness);
   expect(await wrapped.ping.execute!()).toBe("pong");
 });
+
+test("cassette public API is exported", () => {
+  expect(typeof mockist.expectCassetteFullyUsed).toBe("function");
+  expect(typeof mockist.cassetteExpectedCalls).toBe("function");
+  expect(typeof mockist.defaultRedactor).toBe("function");
+  expect(mockist.CASSETTE_FORMAT_VERSION).toBe(1);
+});
