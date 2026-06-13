@@ -29,7 +29,11 @@ function scrub(value: unknown): unknown {
   return value;
 }
 
-/** Default redactor: deep-scrub secret-keyed values in input and output. Pure (no mutation). */
+/**
+ * Default redactor: deep-scrub secret-keyed values in input and output. Pure (no mutation).
+ * Note: error messages are NOT redacted — a secret echoed in an upstream error message will
+ * be written to the cassette.
+ */
 export function defaultRedactor(call: Call): Call {
   return { ...call, input: scrub(call.input), output: scrub(call.output) };
 }

@@ -24,3 +24,9 @@ test("redaction sentinels auto-wildcard their own paths", () => {
   const e = entry({ input: { q: "x", headers: { authorization: "[REDACTED:authorization]" } } });
   expect(inputMatches(e, { q: "x", headers: { authorization: "Bearer real-token" } })).toBe(true);
 });
+
+test("exact match tolerates non-cloneable inputs (no structuredClone on empty ignore)", () => {
+  const fn = () => 1;
+  const e = entry({ input: { cb: fn } });
+  expect(() => inputMatches(e, { cb: fn })).not.toThrow();
+});

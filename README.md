@@ -85,7 +85,7 @@ const harness = createHarness({
 A cassette is an overlay: matched calls are served from the file; unmatched calls follow
 `onUnhandled`. Recording requires the once-registered setup module so cassettes flush without a
 per-test `save()` — Vitest: `setupFiles: ["mockist/vitest-setup"]`; Jest:
-`setupFilesAfterEach: ["mockist/jest-setup"]`. Secrets in recorded inputs/outputs are scrubbed
+`setupFilesAfterEnv: ["mockist/jest-setup"]`. Secrets in recorded inputs/outputs are scrubbed
 to `[REDACTED:<field>]`, and redacted input fields auto-wildcard so replay still matches.
 Per-entry `match: "name"` or `match: { ignore: ["input.requestId"] }` relax matching for
 name-only or noisy fields. Inspect coverage with `harness.cassetteState()` /

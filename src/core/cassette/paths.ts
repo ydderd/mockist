@@ -17,6 +17,7 @@ const BLANK = " mockist:ignored ";
 
 /** Deep clone of `root` with each existing dotted path overwritten by a fixed token. */
 export function blankPaths(root: unknown, paths: string[]): unknown {
+  if (paths.length === 0) return root;
   const clone = structuredClone(root);
   for (const path of paths) {
     const tokens = parsePath(path);

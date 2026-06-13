@@ -1,5 +1,5 @@
 import type { Call, CallKind, RecordedEntry, RecordedError } from "../types";
-import { isRedacted } from "./redact";
+import { findRedactedPaths } from "./paths";
 
 export const CASSETTE_FORMAT_VERSION = 1;
 
@@ -76,17 +76,10 @@ function sortKeys(value: unknown): unknown {
 }
 
 function manifest(calls: RecordedEntry[]): string[] {
-  const paths: string[] = [];
-  const walk = (v: unknown, path: string): void => {
-    if (typeof v === "string") { if (isRedacted(v)) paths.push(path); return; }
-    if (Array.isArray(v)) { v.forEach((item, i) => walk(item, `${path}[${i}]`)); return; }
-    if (v && typeof v === "object") for (const [k, val] of Object.entries(v)) walk(val, `${path}.${k}`);
-  };
-  calls.forEach((entry, i) => {
-    walk(entry.input, `calls[${i}].input`);
-    walk(entry.output, `calls[${i}].output`);
-  });
-  return paths;
+  return calls.flatMap((entry, i) => [
+    ...findRedactedPaths(entry.input, `calls[${i}].input`),
+    ...findRedactedPaths(entry.output, `calls[${i}].output`),
+  ]);
 }
 
 /** Serialize a recorded trajectory to deterministic cassette JSON. Throws on non-serializable values. */

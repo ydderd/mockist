@@ -77,7 +77,7 @@ export class Harness {
   /** Cassette coverage: matched/missed calls and unused recorded entries. */
   cassetteState(): CassetteState {
     const base = this.cassette?.state() ?? { matched: [], missed: [], unused: [] };
-    return { path: this.cassettePath ?? "", entries: this.cassette?.entries ?? [], ...base };
+    return { path: this.cassettePath ?? "", entries: [...(this.cassette?.entries ?? [])], ...base };
   }
 
   /** Write the cassette in record mode; a no-op otherwise. Driven by the runner setup hook. */
