@@ -1,5 +1,6 @@
-import type { Call, CallKind, SequenceStubState } from "./types";
+import type { Call, CallKind, CassetteState, RecordedEntry, ResolverInput, SequenceStubState } from "./types";
 import { deepEqual } from "./deep-equal";
+import type { Harness } from "./harness";
 
 /**
  * Result of a trajectory assertion. Runner-agnostic by design: it never throws and
@@ -234,4 +235,49 @@ export function expectNoExhaustedSequences(
       ].join("\n");
     },
   };
+}
+
+function describeInput(call: ResolverInput, index: number): string {
+  return `  [${index}] ${call.kind} ${call.name} input=${formatValue(call.input)}`;
+}
+
+function describeEntry(entry: RecordedEntry, index: number): string {
+  const kind = entry.kind ?? "tool";
+  const body = entry.error !== undefined ? `error=${formatValue(entry.error)}` : `output=${formatValue(entry.output)}`;
+  return `  [${index}] ${kind} ${entry.name} input=${formatValue(entry.input)} ${body}`;
+}
+
+/** Every recorded entry was consumed and no call missed the cassette. */
+export function expectCassetteFullyUsed(state: CassetteState): AssertionResult {
+  const pass = state.missed.length === 0 && state.unused.length === 0;
+  return {
+    pass,
+    message: () => {
+      if (pass) return `Cassette "${state.path}" fully used: every entry consumed, no misses.`;
+      const lines = [`Cassette "${state.path}" not fully used.`];
+      if (state.missed.length) {
+        lines.push(`Missed entries — calls that matched no cassette entry (${state.missed.length}):`, ...state.missed.map(describeInput));
+      }
+      if (state.unused.length) {
+        lines.push(`Unused entries — recorded entries never called (${state.unused.length}):`, ...state.unused.map(describeEntry));
+      }
+      return lines.join("\n");
+    },
+  };
+}
+
+/**
+ * Derive an ordered ExpectedCall[] from a harness's loaded cassette entries, for asserting
+ * call ORDER via expectExactTrajectory/expectSubsequence. Asserts name + kind only — input is
+ * intentionally omitted, because cassette entries may match loosely (`match`/redaction
+ * wildcards) and the exact-trajectory matcher deep-equals input, which would false-negative on
+ * an ignored or redacted field. Input is already validated by cassette matching at replay;
+ * use expectCalledWith for explicit input assertions.
+ */
+export function cassetteExpectedCalls(harness: Harness): ExpectedCall[] {
+  return harness.cassetteState().entries.map((entry) => {
+    const spec: ExpectedCall = { name: entry.name };
+    if (entry.kind !== undefined) spec.kind = entry.kind;
+    return spec;
+  });
 }
