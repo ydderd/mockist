@@ -25,21 +25,39 @@
     "llm"
   ],
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./vitest-setup": {
-      "types": "./dist/setup/vitest.d.ts",
-      "import": "./dist/setup/vitest.js"
+      "import": {
+        "types": "./dist/setup/vitest.d.ts",
+        "default": "./dist/setup/vitest.js"
+      },
+      "require": {
+        "types": "./dist/setup/vitest.d.cts",
+        "default": "./dist/setup/vitest.cjs"
+      }
     },
     "./jest-setup": {
-      "types": "./dist/setup/jest.d.ts",
-      "import": "./dist/setup/jest.js"
+      "import": {
+        "types": "./dist/setup/jest.d.ts",
+        "default": "./dist/setup/jest.js"
+      },
+      "require": {
+        "types": "./dist/setup/jest.d.cts",
+        "default": "./dist/setup/jest.cjs"
+      }
     }
   },
   "bin": {
