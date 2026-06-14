@@ -11,7 +11,7 @@ export interface CassetteResolver {
 function produce(entry: RecordedEntry): Resolution {
   return {
     produce: () => {
-      if (entry.error !== undefined) {
+      if (entry.error != null) {
         const err = new Error(entry.error.message);
         err.name = entry.error.name;
         throw err;

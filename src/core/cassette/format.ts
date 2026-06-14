@@ -28,11 +28,11 @@ export function parseCassette(text: string, path: string): RecordedEntry[] {
   }
   data.calls.forEach((entry, i) => {
     const hasOutput = "output" in entry;
-    const hasError = "error" in entry && entry.error != null;
-    if (hasOutput === hasError) {
+    const hasErrorKey = "error" in entry;
+    if (hasOutput === hasErrorKey) {
       throw new Error(`mockist: cassette "${path}" call [${i}] ("${entry.name}") must define exactly one of "output" or "error"`);
     }
-    if (hasError && (typeof entry.error !== "object" || typeof entry.error.message !== "string")) {
+    if (hasErrorKey && (entry.error == null || typeof entry.error !== "object" || typeof entry.error.message !== "string")) {
       throw new Error(`mockist: cassette "${path}" call [${i}] ("${entry.name}") has an invalid "error" object`);
     }
     if (entry.match !== undefined && entry.match !== "name") {

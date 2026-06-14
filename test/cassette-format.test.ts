@@ -28,7 +28,12 @@ test("parseCassette throws on malformed JSON, bad version, and bad entry", () =>
     mockist_format_version: CASSETTE_FORMAT_VERSION,
     calls: [{ name: "t", error: null }],
   });
-  expect(() => parseCassette(nullError, "x.json")).toThrow(/exactly one of/);
+  expect(() => parseCassette(nullError, "x.json")).toThrow(/invalid "error"/);
+  const nullErrorWithOutput = JSON.stringify({
+    mockist_format_version: CASSETTE_FORMAT_VERSION,
+    calls: [{ name: "t", output: 1, error: null }],
+  });
+  expect(() => parseCassette(nullErrorWithOutput, "x.json")).toThrow(/exactly one of/);
   const badMatch = JSON.stringify({
     mockist_format_version: CASSETTE_FORMAT_VERSION,
     calls: [{ name: "t", output: 1, match: {} }],
