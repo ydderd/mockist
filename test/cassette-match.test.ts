@@ -30,3 +30,14 @@ test("exact match tolerates non-cloneable inputs (no structuredClone on empty ig
   const e = entry({ input: { cb: fn } });
   expect(() => inputMatches(e, { cb: fn })).not.toThrow();
 });
+
+test("ignore/redaction matching tolerates non-cloneable inputs elsewhere", () => {
+  const fn = () => 1;
+  const e = entry({
+    input: { q: "x", headers: { authorization: "[REDACTED:authorization]" }, cb: fn },
+  });
+  expect(() =>
+    inputMatches(e, { q: "x", headers: { authorization: "Bearer real" }, cb: fn }),
+  ).not.toThrow();
+  expect(inputMatches(e, { q: "x", headers: { authorization: "Bearer real" }, cb: fn })).toBe(true);
+});

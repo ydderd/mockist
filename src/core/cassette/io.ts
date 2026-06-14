@@ -4,6 +4,8 @@ import { dirname } from "node:path";
 import type { Call, RecordedEntry } from "../types";
 import { parseCassette, serializeCassette } from "./format";
 
+const missingCassetteWarned = new Set<string>();
+
 /** Load + parse a cassette. A missing file warns once and yields no entries. */
 export function loadCassetteEntries(path: string): RecordedEntry[] {
   let text: string;
@@ -11,9 +13,12 @@ export function loadCassetteEntries(path: string): RecordedEntry[] {
     text = readFileSync(path, "utf8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") {
-      console.warn(
-        `mockist: cassette "${path}" not found — no recorded calls loaded (all calls use the onUnhandled policy).`,
-      );
+      if (!missingCassetteWarned.has(path)) {
+        missingCassetteWarned.add(path);
+        console.warn(
+          `mockist: cassette "${path}" not found — no recorded calls loaded (all calls use the onUnhandled policy).`,
+        );
+      }
       return [];
     }
     throw e;

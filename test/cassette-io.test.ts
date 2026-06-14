@@ -11,7 +11,9 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 test("missing cassette warns once and returns empty", () => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-  expect(loadCassetteEntries(join(dir, "nope.json"))).toEqual([]);
+  const path = join(dir, "nope.json");
+  expect(loadCassetteEntries(path)).toEqual([]);
+  expect(loadCassetteEntries(path)).toEqual([]);
   expect(warn).toHaveBeenCalledTimes(1);
   warn.mockRestore();
 });

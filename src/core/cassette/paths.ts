@@ -15,10 +15,36 @@ export function parsePath(path: string): PathToken[] {
 
 const BLANK = " mockist:ignored ";
 
+function cloneForBlanking(root: unknown, seen = new WeakMap<object, unknown>()): unknown {
+  if (root === null || typeof root !== "object") return root;
+  if (seen.has(root)) return seen.get(root);
+  if (Array.isArray(root)) {
+    const copy = root.map((item) => cloneForBlanking(item, seen));
+    seen.set(root, copy);
+    return copy;
+  }
+  const copy: Record<string, unknown> = {};
+  seen.set(root, copy);
+  for (const [key, value] of Object.entries(root)) copy[key] = cloneForBlanking(value, seen);
+  return copy;
+}
+
+function safeCloneForBlanking(root: unknown): unknown {
+  try {
+    return structuredClone(root);
+  } catch {
+    try {
+      return JSON.parse(JSON.stringify(root));
+    } catch {
+      return cloneForBlanking(root);
+    }
+  }
+}
+
 /** Deep clone of `root` with each existing dotted path overwritten by a fixed token. */
 export function blankPaths(root: unknown, paths: string[]): unknown {
   if (paths.length === 0) return root;
-  const clone = structuredClone(root);
+  const clone = safeCloneForBlanking(root);
   for (const path of paths) {
     const tokens = parsePath(path);
     let cur: any = clone;

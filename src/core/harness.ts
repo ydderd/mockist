@@ -31,6 +31,8 @@ export class Harness {
   private readonly cassettePath?: string;
   private readonly recording: boolean;
   private readonly cassette?: CassetteResolver;
+  /** Survives reset() so runner afterEach flush can save after harness.reset() clears the recorder. */
+  private readonly cassetteSaveBuffer: Call[] = [];
 
   constructor(opts: HarnessOptions = {}) {
     const stubResolver = predicateResolver(opts.stubs ?? []);
@@ -83,7 +85,8 @@ export class Harness {
   /** Write the cassette in record mode; a no-op otherwise. Driven by the runner setup hook. */
   async save(): Promise<void> {
     if (!this.recording || !this.cassettePath) return;
-    await writeCassette(this.cassettePath, this.trajectory, { now: new Date().toISOString() });
+    await writeCassette(this.cassettePath, this.cassetteSaveBuffer, { now: new Date().toISOString() });
+    this.cassetteSaveBuffer.length = 0;
   }
 
   reset(): void {
@@ -150,6 +153,9 @@ export class Harness {
     outcome: { stubbed: boolean; output?: unknown; error?: unknown },
   ): void {
     this.recorder.record({ kind, name, input, key, ts: Date.now(), ...outcome });
+    if (this.recording) {
+      this.cassetteSaveBuffer.push(this.trajectory[this.trajectory.length - 1]!);
+    }
   }
 }
 

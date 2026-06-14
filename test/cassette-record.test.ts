@@ -34,3 +34,13 @@ test("save() is a no-op in replay mode", async () => {
   await harness.save();
   expect(existsSync(path)).toBe(false);
 });
+
+test("flush after reset() still writes recorded calls (runner afterEach order)", async () => {
+  process.env.MOCKIST_RECORD = "1";
+  const path = join(dir, "after-reset.json");
+  const harness = createHarness({ cassette: path });
+  await harness.dispatch("tool", "fetch", { q: "x" }, async () => ({ ok: true }));
+  harness.reset();
+  await harness.save();
+  expect(JSON.parse(readFileSync(path, "utf8")).calls).toHaveLength(1);
+});
