@@ -74,7 +74,9 @@ call *matched* a stub, it defers to that tool even under `onUnhandled: "error"`
 Capture a real tool-boundary run once, replay it as a hand-editable JSON cassette.
 
 ```ts
-// record once: MOCKIST_RECORD=1 vitest weather-flow   (real model + tools run)
+// record once (either form runs real model + tools):
+//   MOCKIST_RECORD=1 vitest weather-flow
+//   mockist record -- vitest weather-flow
 // replay every run after:
 const harness = createHarness({
   cassette: "fixtures/weather-flow.json",
@@ -83,13 +85,16 @@ const harness = createHarness({
 ```
 
 A cassette is an overlay: matched calls are served from the file; unmatched calls follow
-`onUnhandled`. Recording requires the once-registered setup module so cassettes flush without a
-per-test `save()` — Vitest: `setupFiles: ["mockist/vitest-setup"]`; Jest:
+`onUnhandled`. In **record** mode (`MOCKIST_RECORD` set), real tools always run —
+`onUnhandled: "error"` is ignored so the cassette can capture live responses. Recording
+requires the once-registered setup module so cassettes flush without a per-test `save()` —
+Vitest: `setupFiles: ["mockist/vitest-setup"]`; Jest:
 `setupFilesAfterEnv: ["mockist/jest-setup"]`. Secrets in recorded inputs/outputs are scrubbed
-to `[REDACTED:<field>]`, and redacted input fields auto-wildcard so replay still matches.
-Per-entry `match: "name"` or `match: { ignore: ["input.requestId"] }` relax matching for
-name-only or noisy fields. Inspect coverage with `harness.cassetteState()` /
-`expectCassetteFullyUsed(...)`; assert order by feeding `cassetteExpectedCalls(harness)` to
+to `[REDACTED:<field>]` (error messages are not redacted), and redacted input fields
+auto-wildcard so replay still matches. Per-entry `match: "name"` or
+`match: { ignore: ["input.requestId"] }` relax matching for name-only or noisy fields.
+Inspect coverage with `harness.cassetteState()` / `expectCassetteFullyUsed(...)`; assert
+call order (name/kind only) by feeding `cassetteExpectedCalls(harness)` to
 `expectExactTrajectory`.
 
 ## Assertions
@@ -97,7 +102,8 @@ name-only or noisy fields. Inspect coverage with `harness.cassetteState()` /
 `harness.trajectory` is a typed, read-only array of every call (`name`, `input`,
 `output`/`error`, `stubbed`). Helpers: `harness.callsTo(name)`,
 `harness.calledWith(name, input)`. Call `harness.reset()` between tests (clears
-trajectory and sequence cursors; the stub list is fixed at `createHarness` time).
+trajectory, sequence cursors, and cassette consumption state; the stub list is fixed at
+`createHarness` time).
 
 ### Trajectory assertion helpers
 
@@ -134,7 +140,8 @@ Each expected call spec needs only `name`; provide `input`/`output`/`error`/
 > `expectNoUnhandledCalls` and `expectNoPassthroughCalls` check the same bit
 > (`stubbed === false`) — two framings of the same guarantee. Use whichever reads
 > better for your `onUnhandled` mode (catch leaks to real tools, or assert full
-> stub coverage).
+> stub coverage). Deliberate sequence passthrough (`onSequenceExhausted: "passthrough"`)
+> also records `stubbed: false`, so these helpers will flag it.
 
 ### Sequence exhaustion
 
@@ -256,20 +263,19 @@ calls that you forgot to stub fails fast instead of hitting real `execute`.
 
 ### What `resolvers` are for
 
-`createHarness({ resolvers: [...] })` appends custom matchers **after** the stub
-list. They handle calls the stub list missed — they do **not** override an
-already-matching suite stub. For defaults + overrides, merge stub arrays; reserve
-`resolvers` for dynamic or cross-cutting logic (e.g. redaction, logging).
+`createHarness({ resolvers: [...] })` appends custom matchers **after** hand-authored
+stubs and (in replay mode) the cassette resolver. They handle calls those layers missed
+— they do **not** override an already-matching stub or cassette entry. For defaults +
+overrides, merge stub arrays; reserve `resolvers` for dynamic or cross-cutting logic
+(e.g. logging).
 
 ## Not yet (backlog)
 
-Next up: **record → replay fixtures**; dependency replay inside `execute` (fetch
-first, then Prisma/DB/queue — the moat); sub-agent / whole-workflow trajectory
-composition; schema-grounded stubs; runner integrations (Vitest/Jest matchers wrapping
-the assertion helpers above); and MCP / Anthropic / OpenAI adapters. Source of truth
-and ordering:
-[`docs/BACKLOG.md`](docs/BACKLOG.md) (design spec:
-`docs/superpowers/specs/2026-06-06-declarative-tool-stub-harness-design.md`).
+Next up: dependency replay inside `execute` (HTTP first, then Prisma/DB/queue — the
+moat); sub-agent / whole-workflow trajectory composition; schema-grounded stubs; runner
+integrations (Vitest/Jest matchers wrapping the assertion helpers above); and MCP /
+Anthropic / OpenAI adapters. Source of truth and ordering:
+[`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ## License
 
