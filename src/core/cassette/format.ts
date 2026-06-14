@@ -35,6 +35,11 @@ export function parseCassette(text: string, path: string): RecordedEntry[] {
     if (hasError && (typeof entry.error !== "object" || typeof entry.error.message !== "string")) {
       throw new Error(`mockist: cassette "${path}" call [${i}] ("${entry.name}") has an invalid "error" object`);
     }
+    if (entry.match !== undefined && entry.match !== "name") {
+      if (typeof entry.match !== "object" || !Array.isArray(entry.match.ignore)) {
+        throw new Error(`mockist: cassette "${path}" call [${i}] ("${entry.name}") has an invalid "match" directive`);
+      }
+    }
   });
   return data.calls;
 }

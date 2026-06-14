@@ -3,7 +3,10 @@ import { deepEqual } from "../deep-equal";
 import { blankPaths, findRedactedPaths } from "./paths";
 
 function ignorePathsFor(entry: RecordedEntry): string[] {
-  const explicit = entry.match && typeof entry.match === "object" ? entry.match.ignore : [];
+  const explicit =
+    entry.match && typeof entry.match === "object" && Array.isArray(entry.match.ignore)
+      ? entry.match.ignore
+      : [];
   return [...explicit, ...findRedactedPaths(entry.input, "input")];
 }
 
