@@ -24,6 +24,11 @@ test("parseCassette throws on malformed JSON, bad version, and bad entry", () =>
     calls: [{ name: "t", output: 1, error: { name: "Error", message: "e" } }],
   });
   expect(() => parseCassette(both, "x.json")).toThrow(/exactly one of/);
+  const nullError = JSON.stringify({
+    mockist_format_version: CASSETTE_FORMAT_VERSION,
+    calls: [{ name: "t", error: null }],
+  });
+  expect(() => parseCassette(nullError, "x.json")).toThrow(/exactly one of/);
 });
 
 test("serializeCassette emits sorted-key JSON, a manifest, and maps errors", () => {
@@ -45,4 +50,10 @@ test("serializeCassette emits sorted-key JSON, a manifest, and maps errors", () 
 
 test("serializeCassette throws on non-serializable output", () => {
   expect(() => serializeCassette([call({ output: () => 1 })], { now: "t" })).toThrow(/serializ/i);
+});
+
+test("serializeCassette throws on circular references", () => {
+  const input: Record<string, unknown> = { a: 1 };
+  input.self = input;
+  expect(() => serializeCassette([call({ input })], { now: "t" })).toThrow(/circular reference/i);
 });

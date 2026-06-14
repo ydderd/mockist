@@ -84,7 +84,7 @@ export class Harness {
 
   /** Write the cassette in record mode; a no-op otherwise. Driven by the runner setup hook. */
   async save(): Promise<void> {
-    if (!this.recording || !this.cassettePath) return;
+    if (!this.recording || !this.cassettePath || this.cassetteSaveBuffer.length === 0) return;
     await writeCassette(this.cassettePath, this.cassetteSaveBuffer, { now: new Date().toISOString() });
     this.cassetteSaveBuffer.length = 0;
   }

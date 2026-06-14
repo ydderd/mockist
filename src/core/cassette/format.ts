@@ -28,9 +28,12 @@ export function parseCassette(text: string, path: string): RecordedEntry[] {
   }
   data.calls.forEach((entry, i) => {
     const hasOutput = "output" in entry;
-    const hasError = "error" in entry;
+    const hasError = "error" in entry && entry.error != null;
     if (hasOutput === hasError) {
       throw new Error(`mockist: cassette "${path}" call [${i}] ("${entry.name}") must define exactly one of "output" or "error"`);
+    }
+    if (hasError && (typeof entry.error !== "object" || typeof entry.error.message !== "string")) {
+      throw new Error(`mockist: cassette "${path}" call [${i}] ("${entry.name}") has an invalid "error" object`);
     }
   });
   return data.calls;
@@ -41,13 +44,26 @@ function toRecordedError(error: unknown): RecordedError {
   return { name: "Error", message: String(error) };
 }
 
-function assertSerializable(value: unknown, where: string): void {
+function assertSerializable(value: unknown, where: string, seen = new WeakSet<object>()): void {
   const t = typeof value;
   if (t === "function" || t === "bigint" || t === "symbol") {
     throw new Error(`mockist: cannot serialize ${t} at ${where} — cassette values must be JSON-serializable`);
   }
-  if (Array.isArray(value)) value.forEach((v, i) => assertSerializable(v, `${where}[${i}]`));
-  else if (value && t === "object") for (const [k, v] of Object.entries(value)) assertSerializable(v, `${where}.${k}`);
+  if (Array.isArray(value)) {
+    if (seen.has(value)) {
+      throw new Error(`mockist: cannot serialize circular reference at ${where} — cassette values must be JSON-serializable`);
+    }
+    seen.add(value);
+    value.forEach((v, i) => assertSerializable(v, `${where}[${i}]`, seen));
+    return;
+  }
+  if (value && t === "object") {
+    if (seen.has(value)) {
+      throw new Error(`mockist: cannot serialize circular reference at ${where} — cassette values must be JSON-serializable`);
+    }
+    seen.add(value);
+    for (const [k, v] of Object.entries(value)) assertSerializable(v, `${where}.${k}`, seen);
+  }
 }
 
 function toEntry(call: Call, index: number): RecordedEntry {

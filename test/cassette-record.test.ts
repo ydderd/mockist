@@ -1,5 +1,5 @@
 import { afterAll, afterEach, expect, test, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHarness } from "../src/core/harness";
@@ -33,6 +33,15 @@ test("save() is a no-op in replay mode", async () => {
   const harness = createHarness({ cassette: path }); // MOCKIST_RECORD unset → replay
   await harness.save();
   expect(existsSync(path)).toBe(false);
+});
+
+test("save() is a no-op when no calls were recorded", async () => {
+  process.env.MOCKIST_RECORD = "1";
+  const path = join(dir, "empty.json");
+  writeFileSync(path, JSON.stringify({ mockist_format_version: 1, calls: [{ name: "keep", output: 1 }] }));
+  const harness = createHarness({ cassette: path });
+  await harness.save();
+  expect(JSON.parse(readFileSync(path, "utf8")).calls[0].name).toBe("keep");
 });
 
 test("flush after reset() still writes recorded calls (runner afterEach order)", async () => {
