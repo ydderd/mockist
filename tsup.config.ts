@@ -2,7 +2,8 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: ["src/index.ts", "src/setup/vitest.ts", "src/setup/jest.ts", "src/cli.ts"],
-  format: ["esm"],
+  // Dual ESM + CJS: Vitest consumers resolve ESM, Jest (default CommonJS) resolves CJS.
+  format: ["esm", "cjs"],
   dts: true,
   clean: true,
   sourcemap: true,
