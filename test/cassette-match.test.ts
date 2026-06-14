@@ -17,12 +17,19 @@ test('match "name": any input matches', () => {
 test("match.ignore drops listed paths from comparison", () => {
   const e = entry({ input: { q: "x", requestId: "abc" }, match: { ignore: ["input.requestId"] } });
   expect(inputMatches(e, { q: "x", requestId: "zzz" })).toBe(true);
+  expect(inputMatches(e, { q: "x" })).toBe(true);
   expect(inputMatches(e, { q: "DIFF", requestId: "zzz" })).toBe(false);
+});
+
+test("match.ignore tolerates extra ignored fields on the live call", () => {
+  const e = entry({ input: { q: "x" }, match: { ignore: ["input.requestId"] } });
+  expect(inputMatches(e, { q: "x", requestId: "zzz" })).toBe(true);
 });
 
 test("redaction sentinels auto-wildcard their own paths", () => {
   const e = entry({ input: { q: "x", headers: { authorization: "[REDACTED:authorization]" } } });
   expect(inputMatches(e, { q: "x", headers: { authorization: "Bearer real-token" } })).toBe(true);
+  expect(inputMatches(e, { q: "x", headers: {} })).toBe(true);
 });
 
 test("exact match tolerates non-cloneable inputs (no structuredClone on empty ignore)", () => {

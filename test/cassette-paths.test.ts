@@ -6,11 +6,12 @@ test("parsePath splits names and array indices", () => {
   expect(parsePath("input.requestId")).toEqual(["input", "requestId"]);
 });
 
-test("blankPaths overwrites existing paths with a fixed token, leaves others", () => {
+test("blankPaths removes existing paths so differing values neutralize", () => {
   const a = blankPaths({ input: { q: "x", requestId: "abc" } }, ["input.requestId"]);
   const b = blankPaths({ input: { q: "x", requestId: "zzz" } }, ["input.requestId"]);
-  expect(a).toEqual(b); // differing values neutralized
+  expect(a).toEqual(b);
   expect((a as any).input.q).toBe("x");
+  expect((a as any).input.requestId).toBeUndefined();
 });
 
 test("blankPaths is a no-op for paths that do not exist", () => {

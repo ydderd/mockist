@@ -13,7 +13,18 @@ export function parsePath(path: string): PathToken[] {
   return tokens;
 }
 
-const BLANK = " mockist:ignored ";
+function deleteAtPath(root: unknown, path: string): void {
+  const tokens = parsePath(path);
+  let cur: any = root;
+  for (let i = 0; i < tokens.length - 1; i++) {
+    if (cur == null || typeof cur !== "object") return;
+    cur = cur[tokens[i] as keyof typeof cur];
+  }
+  const last = tokens[tokens.length - 1];
+  if (cur != null && typeof cur === "object" && last !== undefined && last in cur) {
+    delete cur[last as keyof typeof cur];
+  }
+}
 
 function cloneForBlanking(root: unknown, seen = new WeakMap<object, unknown>()): unknown {
   if (root === null || typeof root !== "object") return root;
@@ -41,22 +52,11 @@ function safeCloneForBlanking(root: unknown): unknown {
   }
 }
 
-/** Deep clone of `root` with each existing dotted path overwritten by a fixed token. */
+/** Deep clone of `root` with each existing dotted path removed before comparison. */
 export function blankPaths(root: unknown, paths: string[]): unknown {
   if (paths.length === 0) return root;
   const clone = safeCloneForBlanking(root);
-  for (const path of paths) {
-    const tokens = parsePath(path);
-    let cur: any = clone;
-    for (let i = 0; i < tokens.length - 1; i++) {
-      if (cur == null || typeof cur !== "object") { cur = undefined; break; }
-      cur = cur[tokens[i] as keyof typeof cur];
-    }
-    const last = tokens[tokens.length - 1];
-    if (cur != null && typeof cur === "object" && last !== undefined && last in cur) {
-      cur[last as keyof typeof cur] = BLANK;
-    }
-  }
+  for (const path of paths) deleteAtPath(clone, path);
   return clone;
 }
 
