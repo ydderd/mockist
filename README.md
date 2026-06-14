@@ -69,6 +69,29 @@ const harness = createHarness({
 call *matched* a stub, it defers to that tool even under `onUnhandled: "error"`
 (the policy governs *un-stubbed* calls, not deliberate passthrough).
 
+## Record → replay (cassettes)
+
+Capture a real tool-boundary run once, replay it as a hand-editable JSON cassette.
+
+```ts
+// record once: MOCKIST_RECORD=1 vitest weather-flow   (real model + tools run)
+// replay every run after:
+const harness = createHarness({
+  cassette: "fixtures/weather-flow.json",
+  onUnhandled: "error", // seal: a call the cassette didn't record fails. Omit for passthrough.
+});
+```
+
+A cassette is an overlay: matched calls are served from the file; unmatched calls follow
+`onUnhandled`. Recording requires the once-registered setup module so cassettes flush without a
+per-test `save()` — Vitest: `setupFiles: ["mockist/vitest-setup"]`; Jest:
+`setupFilesAfterEnv: ["mockist/jest-setup"]`. Secrets in recorded inputs/outputs are scrubbed
+to `[REDACTED:<field>]`, and redacted input fields auto-wildcard so replay still matches.
+Per-entry `match: "name"` or `match: { ignore: ["input.requestId"] }` relax matching for
+name-only or noisy fields. Inspect coverage with `harness.cassetteState()` /
+`expectCassetteFullyUsed(...)`; assert order by feeding `cassetteExpectedCalls(harness)` to
+`expectExactTrajectory`.
+
 ## Assertions
 
 `harness.trajectory` is a typed, read-only array of every call (`name`, `input`,

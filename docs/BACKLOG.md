@@ -109,11 +109,13 @@ engineering.
    messages render an expected-vs-actual diff with per-call name/input/output-or-error/stubbed.
    Closed the sequence-exhaustion tech-debt item via `harness.sequenceState()`. These power
    the later Vitest/Jest matchers (M3 item 8). See [Done #4](#done).
-2. **Record → replay (VCR/cassette)** — capture real tool-boundary runs and generate
-   hand-editable stubs. Additive via the existing extension seams (`identify` / `Call`
-   record / resolver pipeline / redaction hook). Deterministic JSON fixtures, redaction
-   before disk write, fixture loading as stubs, update/approve workflow, clear
-   missing/extra call diffs.
+2. ~~**Record → replay (VCR/cassette)**~~ **(done 2026-06-13)** — capture real tool-boundary
+   runs and replay them as hand-editable JSON cassettes. Cassette is a `HarnessOptions` field
+   (resolver layered between stubs and custom resolvers, ahead of `onUnhandled`); record via
+   `MOCKIST_RECORD` over the existing runner with an auto-save setup hook (Vitest + Jest);
+   consume-once first-match replay; per-entry `match` directives + redaction-sentinel wildcards;
+   coverage via `cassetteState()` / `expectCassetteFullyUsed`. Spec:
+   `docs/superpowers/specs/2026-06-13-record-replay-cassettes-design.md`.
 
 ### M2 — Dependency replay (the moat) — Gate 2
 

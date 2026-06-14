@@ -1,0 +1,50 @@
+import { expect, test } from "vitest";
+import { inputMatches } from "../src/core/cassette/match";
+import type { RecordedEntry } from "../src/core/types";
+
+const entry = (e: Partial<RecordedEntry>): RecordedEntry => ({ name: "t", ...e });
+
+test("default: exact deep-equal of input", () => {
+  expect(inputMatches(entry({ input: { q: "x" } }), { q: "x" })).toBe(true);
+  expect(inputMatches(entry({ input: { q: "x" } }), { q: "y" })).toBe(false);
+});
+
+test('match "name": any input matches', () => {
+  expect(inputMatches(entry({ input: { q: "x" }, match: "name" }), { q: "y" })).toBe(true);
+  expect(inputMatches(entry({ match: "name" }), { anything: 1 })).toBe(true);
+});
+
+test("match.ignore drops listed paths from comparison", () => {
+  const e = entry({ input: { q: "x", requestId: "abc" }, match: { ignore: ["input.requestId"] } });
+  expect(inputMatches(e, { q: "x", requestId: "zzz" })).toBe(true);
+  expect(inputMatches(e, { q: "x" })).toBe(true);
+  expect(inputMatches(e, { q: "DIFF", requestId: "zzz" })).toBe(false);
+});
+
+test("match.ignore tolerates extra ignored fields on the live call", () => {
+  const e = entry({ input: { q: "x" }, match: { ignore: ["input.requestId"] } });
+  expect(inputMatches(e, { q: "x", requestId: "zzz" })).toBe(true);
+});
+
+test("redaction sentinels auto-wildcard their own paths", () => {
+  const e = entry({ input: { q: "x", headers: { authorization: "[REDACTED:authorization]" } } });
+  expect(inputMatches(e, { q: "x", headers: { authorization: "Bearer real-token" } })).toBe(true);
+  expect(inputMatches(e, { q: "x", headers: {} })).toBe(true);
+});
+
+test("exact match tolerates non-cloneable inputs (no structuredClone on empty ignore)", () => {
+  const fn = () => 1;
+  const e = entry({ input: { cb: fn } });
+  expect(() => inputMatches(e, { cb: fn })).not.toThrow();
+});
+
+test("ignore/redaction matching tolerates non-cloneable inputs elsewhere", () => {
+  const fn = () => 1;
+  const e = entry({
+    input: { q: "x", headers: { authorization: "[REDACTED:authorization]" }, cb: fn },
+  });
+  expect(() =>
+    inputMatches(e, { q: "x", headers: { authorization: "Bearer real" }, cb: fn }),
+  ).not.toThrow();
+  expect(inputMatches(e, { q: "x", headers: { authorization: "Bearer real" }, cb: fn })).toBe(true);
+});

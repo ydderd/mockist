@@ -81,3 +81,32 @@ export interface SequenceStubState {
   /** true once a matching call arrived after every step was consumed (ran dry). */
   exhausted: boolean;
 }
+
+/** Per-entry match strictness for a cassette. Default (omitted) = name + deep-equal input. */
+export type MatchDirective = "name" | { ignore: string[] };
+
+/** A recorded error, serialized to JSON-safe fields. */
+export interface RecordedError {
+  name: string;
+  message: string;
+}
+
+/** One recorded call in a cassette. Exactly one of `output` / `error` is present. */
+export interface RecordedEntry {
+  /** defaults to "tool". */
+  kind?: CallKind;
+  name: string;
+  input?: unknown;
+  output?: unknown;
+  error?: RecordedError;
+  match?: MatchDirective;
+}
+
+/** Queryable cassette coverage for a harness. */
+export interface CassetteState {
+  path: string;
+  entries: RecordedEntry[];
+  matched: ResolverInput[];
+  missed: ResolverInput[];
+  unused: RecordedEntry[];
+}
