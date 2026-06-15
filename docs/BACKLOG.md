@@ -5,6 +5,12 @@ debt, and the findings log. Why & how: [PRIMER.md](../PRIMER.md). Usage/API:
 [README.md](../README.md). Design spec:
 `docs/superpowers/specs/2026-06-06-declarative-tool-stub-harness-design.md`.
 
+**Scope:** mockist's unit of test is the **agentic tool/skill call boundary** — did the
+agent call the right tool/skill, with the right args, in the right order, and how did it
+handle the result. What happens *inside* `execute` (HTTP/DB/queue I/O) is ordinary
+implementation code, tested with existing tools (`vi.mock`, nock/MSW/Polly, testcontainers);
+mockist explicitly does **not** go below the boundary. See [What NOT to build](#what-not-to-build).
+
 ---
 
 ## Shipped (M0 — boundary stub harness)
@@ -75,30 +81,25 @@ Prove agent **trajectory** tests feel like relief on a real repo.
 - [x] **Dogfood (Synapse):** real `createWorkflowTools`, scripted model, zero prisma/queue
   mocks; stubbed external tools; assert ordered trajectory. Verdict: **continue**.
 
-### Gate 2 — dependency replay (not started; follows the M1 devex rungs)
+### Gate 2 — dependency replay (retired, 2026-06-14)
 
-The moat gate, taken **after** M1's ergonomics ship. Tier 1, HTTP-only deps first. Prove
-replay beats hand-mocks on tool **internals** (Synapse email skills origin-story bugs).
+**Retired before starting.** This gate was going to prove that replaying recorded HTTP/DB
+responses inside `execute` beats hand-mocks on a tool's *internals*. We cut it: that is
+testing implementation internals, not the agentic boundary — it's ordinary unit testing,
+already well served by `vi.mock` / nock / MSW / Polly / testcontainers, and chasing it pulls
+mockist off its actual job (testing/stubbing agentic tool & skill calls). See
+[What NOT to build](#what-not-to-build) and the [2026-06-14 scope decision](#2026-06-14--scope-decision-dependency-replay-cut).
 
-- [ ] Dependency seam for **HTTP**: `recordedFetch` — log `(method+url+bodyHash) → response`;
-  replay returns recorded response (throws on miss).
-- [ ] Recorder: append `{tool, args, dependencyCalls, result, error}` to fixture files.
-- [ ] `replay(tool, fixture)`: inject recorded HTTP responses, run `execute(args)`, diff.
-- [ ] Vitest matcher or helper for fixture replay assertions.
-- [ ] **Dogfood:** Synapse email skills — capture real `send_email` run; replay; break code;
-  confirm replay catches what hand-mocks missed (e.g. double-send-after-post-send-failure).
-
-**Kill/continue for gate 2:** if replacing hand-mocks on *internals* feels like relief,
-build out M2 below (Prisma/DB/queue seams). If ceremony, document why and keep the
-ergonomics layer (M0 + M1) as the product — it stands alone.
+The next gates are **at the boundary**: reach (more SDK adapters) and whole-workflow
+trajectory composition — see the roadmap below.
 
 ---
 
-## Roadmap (post-M0, devex-first)
+## Roadmap (post-M0, boundary-first)
 
-Test ergonomics ahead of the dependency-replay moat — each rung is independently useful,
-making hand-authored tests genuine relief before we take on the hard captured-fixture
-engineering.
+Everything below keeps the unit of test at the **agentic tool/skill call boundary**: make
+hand-authored boundary tests genuine relief (M1), then extend that same harness/recorder
+model across more agent SDKs and across multi-agent workflows (M2), then host it (M3).
 
 ### M1 — Test ergonomics (the devex unlock)
 
@@ -108,7 +109,7 @@ engineering.
    no-passthrough, no-exhausted-sequences. Each returns `{ pass, message() }`; failure
    messages render an expected-vs-actual diff with per-call name/input/output-or-error/stubbed.
    Closed the sequence-exhaustion tech-debt item via `harness.sequenceState()`. These power
-   the later Vitest/Jest matchers (M3 item 8). See [Done #4](#done).
+   the later Vitest/Jest matchers (M2 item 6). See [Done #4](#done).
 2. ~~**Record → replay (VCR/cassette)**~~ **(done 2026-06-13)** — capture real tool-boundary
    runs and replay them as hand-editable JSON cassettes. Cassette is a `HarnessOptions` field
    (resolver layered between stubs and custom resolvers, ahead of `onUnhandled`); record via
@@ -117,44 +118,35 @@ engineering.
    coverage via `cassetteState()` / `expectCassetteFullyUsed`. Spec:
    `docs/superpowers/specs/2026-06-13-record-replay-cassettes-design.md`.
 
-### M2 — Dependency replay (the moat) — Gate 2
+### M2 — Reach + reproducible in CI (PLG rung 3)
 
-3. **Dependency replay v1: fetch/HTTP inside `execute`** — begin the moat. Boundary
-   stubbing tests whether the agent called the right tool; dependency replay tests whether
-   the tool implementation behaves correctly. Start with an explicit
-   `mockistFetch(fetch, harness)` seam that records method, URL, body hash/body, status,
-   headers, and response body, then replays without network and fails on unrecorded HTTP
-   calls in replay mode. Dependency calls attach to the parent tool call.
-4. **Dependency replay v2: Prisma / DB / queue / MCP clients** — after HTTP proves the
-   replay model, add explicit seams for common stateful dependencies. This is the
-   capability that catches origin-story bugs inside `execute`: retries, non-atomic claims,
-   duplicate side effects, cross-tenant lookups, and post-side-effect failures.
-5. **Sub-agent / whole-workflow harness composition** *(from the dogfood)* — one harness
+Extend the boundary harness across more agent SDKs and across multi-agent workflows, then
+make boundary tests reproducible in CI. Same harness/recorder model, wider surface.
+
+3. **Sub-agent / whole-workflow harness composition** *(from the dogfood)* — one harness
    only observes the tool set it wrapped, and each sub-agent / handoff runs its own loop.
    Provide a way to attach one harness across the sub-agent boundary, or merge trajectories
-   from multiple harnesses, so a whole workflow's trajectory is observable.
-
-### M3 — Reach + reproducible in CI (PLG rung 3)
-
-6. **More adapters** — Claude Agent SDK (tools, skills, AND sub-agents all flow through the
+   from multiple harnesses, so a whole workflow's tool/skill trajectory is observable. The
+   highest-value boundary-level reach item.
+4. **More adapters** — Claude Agent SDK (tools, skills, AND sub-agents all flow through the
    `tool_name` path: PreToolUse `deny` + PostToolUse `updatedToolOutput`); MCP; OpenAI.
    Keep adapters thin: normalize tool definitions and route calls into the same
    harness/recorder model.
-7. **Schema-grounded stubs and fixtures** — validate stub output against the tool's JSON
+5. **Schema-grounded stubs and fixtures** — validate stub output against the tool's JSON
    Schema where available; optionally generate starter stubs from schema. Prevents fake
    fixtures from drifting away from real tool contracts. Not the main value prop — SDKs
    already do a lot of input validation.
-8. **Runner integrations** — optional Vitest/Jest matchers such as `toHaveCalledTool`,
+6. **Runner integrations** — optional Vitest/Jest matchers such as `toHaveCalledTool`,
    `toHaveToolTrajectory`, `toHaveNoUnhandledToolCalls`, backed by the runner-agnostic
    assertion core. Later than assertion helpers so the library doesn't become
    test-runner-shaped too early.
-9. **GitHub Action + cross-model replay** — run the fixture suite on PRs; comment a diff;
-   gate on regressions. Re-run scenarios with the model swapped.
+7. **GitHub Action + cross-model replay** — run the cassette/trajectory suite on PRs;
+   comment a diff; gate on regressions. Re-run scenarios with the model swapped.
 
-### M4 — Hosted (PLG rungs 3–4, the platform)
+### M3 — Hosted (PLG rungs 3–4, the platform)
 
-10. Upload fixtures/runs; audit trail; team dashboards; cross-model/version diffing as a
-    service; suite gating.
+8. Upload cassettes/runs; audit trail; team dashboards; cross-model/version diffing as a
+   service; suite gating.
 
 ---
 
@@ -162,18 +154,27 @@ engineering.
 
 - **Language/dist:** TS-first (matches the SDKs); ship as an npm package + CLI. Python
   adapter later if pulled.
-- **Dependency seam ergonomics:** how close to truly one-line can the common wrappers get?
-  This determines adoption (see PRIMER risk #4).
+- **Adapter ergonomics:** how close to truly one-line can each SDK wrapper get
+  (`wrapVercelTools` and its Claude/MCP/OpenAI siblings)? Friction at the boundary
+  determines adoption (see PRIMER risk #4).
 - **Secret redaction on capture:** non-negotiable before any upload tier; design it into
-  the recorder from M1.
-- **Scope discipline (devex-first):** M0 + M1 (boundary stubs, assertion helpers,
-  record→replay) are the adoption wedge — make hand-authored tests genuine relief before
-  the hard part. Tier-1 dependency replay (M2) is the differentiator and moat. Resist
-  becoming "another eval dashboard" (hosted traces, LLM-judge-first) without replay
-  underneath.
+  the cassette recorder (shipped in M1).
+- **Scope discipline (boundary-first):** the differentiator is being **the zero-spec
+  test/stub harness for the agentic tool & skill boundary** — derived from the SDK tool
+  defs you already wrote, working the same way across every agent SDK and across multi-agent
+  workflows. Stay at the boundary: do **not** drift below it into dependency replay / DB-HTTP
+  stubbing (crowded, and it's regular unit testing), and do **not** drift sideways into
+  "another eval dashboard" (hosted traces, LLM-judge-first).
 
 ## What NOT to build
 
+- **Dependency replay / generic DB/HTTP stubbing inside `execute`.** Stubbing or replaying
+  the I/O a tool performs internally (fetch/Prisma/queue) is testing implementation
+  internals, not the agentic boundary. It is ordinary unit testing — already well served by
+  `vi.mock`, nock/MSW/Polly, and testcontainers — and it duplicates a crowded space while
+  pulling mockist off its actual job. If you own `execute`, unit-test it directly with those
+  tools. (Retired [Gate 2](#gate-2--dependency-replay-retired-2026-06-14); see the
+  [2026-06-14 scope decision](#2026-06-14--scope-decision-dependency-replay-cut).)
 - A capability-spec DSL (the tool def is the spec — ingest it).
 - A generic prompt/eval playground (overlaps incumbents).
 - MCP-only scope (it's one adapter, not the product).
@@ -181,6 +182,30 @@ engineering.
 ---
 
 ## Findings log
+
+### 2026-06-14 — Scope decision: dependency replay cut
+
+Decided to **retire dependency replay inside `execute`** (the former Gate 2 / M2 moat) and
+fix mockist's scope at the **agentic tool/skill call boundary**.
+
+**Why.** Mockist's job is to let developers test and stub the tool/skill calls an agent makes
+in their app — *did the model call the right tool, with the right args, in the right order,
+and handle the result*. Replaying the HTTP/DB/queue I/O a tool does *inside* `execute` is a
+different job: testing implementation internals. That is ordinary unit testing, and it is
+already well served by `vi.mock`, nock/MSW/Polly, and testcontainers. If you own `execute`,
+you unit-test it directly. Building a mockist-native dependency-replay layer would duplicate
+a crowded space and pull the product off the one thing it is uniquely good at.
+
+This reverses the 2026-06-08 reprioritization (below), which had promoted "dependency replay
+inside `execute`" to a first-class moat item. The 2026-06-08 *observation* still stands —
+boundary stubbing genuinely cannot see bugs inside `execute` — but the *conclusion* changed:
+that gap is intentional and out of scope, not a thing for mockist to close.
+
+**Consequences.** Gate 2 retired; former M2 (dependency replay v1/v2) removed; sub-agent /
+whole-workflow trajectory composition promoted into the new boundary-level M2 (reach + CI).
+New differentiator stated under [Decisions to make early](#decisions-to-make-early): the
+zero-spec test/stub harness for the agentic tool & skill boundary, across every agent SDK.
+PRIMER.md and README.md updated to match.
 
 ### 2026-06-08 — Synapse dogfood (verdict: CONTINUE — relief, not ceremony)
 
