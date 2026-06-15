@@ -271,11 +271,12 @@ overrides, merge stub arrays; reserve `resolvers` for dynamic or cross-cutting l
 
 ## Not yet (backlog)
 
-Next up: dependency replay inside `execute` (HTTP first, then Prisma/DB/queue — the
-moat); sub-agent / whole-workflow trajectory composition; schema-grounded stubs; runner
-integrations (Vitest/Jest matchers wrapping the assertion helpers above); and MCP /
-Anthropic / OpenAI adapters. Source of truth and ordering:
-[`docs/BACKLOG.md`](docs/BACKLOG.md).
+Next up, all at the agentic tool/skill **boundary**: sub-agent / whole-workflow trajectory
+composition; more SDK adapters (Claude Agent SDK / MCP / OpenAI); schema-grounded stubs;
+runner integrations (Vitest/Jest matchers wrapping the assertion helpers above); and a CI
+GitHub Action. Out of scope by design: dependency replay / DB-HTTP stubbing *inside*
+`execute` (that's ordinary unit testing — use `vi.mock` / nock / MSW / testcontainers).
+Source of truth and ordering: [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ## License
 
