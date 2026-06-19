@@ -11,6 +11,9 @@ export default defineConfig({
 });
 ```
 
+Jest equivalent: add `mockist/jest-matchers` to `setupFilesAfterEnv` in `jest.config.js`.
+See `test/jest-matchers.test.ts` for a smoke test.
+
 ## Matchers
 
 | Matcher | Asserts |

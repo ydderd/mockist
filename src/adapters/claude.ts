@@ -1,5 +1,6 @@
 import type { CallKind } from "../core/types";
 import type { Harness } from "../core/harness";
+import { identify } from "../core/identity";
 
 /** Structural subset of Claude Agent SDK PreToolUse hook input. */
 export interface PreToolUseHookInput {
@@ -88,6 +89,16 @@ function kindForTool(
   return "tool";
 }
 
+/** Correlate PreToolUse deny with PostToolUseFailure across hook callbacks. */
+function correlationKey(
+  kind: CallKind,
+  name: string,
+  input: unknown,
+  toolUseId?: string,
+): string {
+  return toolUseId || identify(kind, name, input);
+}
+
 /**
  * Claude Agent SDK hooks that route every tool/skill/sub-agent call through the harness.
  *
@@ -103,9 +114,9 @@ export function createClaudeAgentHooks(
   const subagentNames = new Set(opts.subagentNames);
   const pending = new Map<string, PendingStub>();
 
-  const preToolUse: ClaudeHookCallback = async (input) => {
+  const preToolUse: ClaudeHookCallback = async (input, toolUseId) => {
     if (input.hook_event_name !== "PreToolUse") return {};
-    const { tool_name, tool_input, tool_use_id: toolUseId } = input;
+    const { tool_name, tool_input } = input;
     const kind = kindForTool(tool_name, skillNames, subagentNames);
     const resolved = await harness.resolveCall(kind, tool_name, tool_input);
 
@@ -119,7 +130,7 @@ export function createClaudeAgentHooks(
           },
         };
       }
-      const key = toolUseId ?? `${tool_name}:${Date.now()}`;
+      const key = correlationKey(kind, tool_name, tool_input, toolUseId ?? input.tool_use_id);
       if ("error" in resolved) {
         pending.set(key, { kind, name: tool_name, input: tool_input, error: resolved.error });
       } else {
@@ -142,19 +153,23 @@ export function createClaudeAgentHooks(
     };
   };
 
-  const postToolUse: ClaudeHookCallback = async (input) => {
+  const postToolUse: ClaudeHookCallback = async (input, toolUseId) => {
     if (input.hook_event_name !== "PostToolUse") return {};
     const { tool_name, tool_input, tool_response } = input;
     const kind = kindForTool(tool_name, skillNames, subagentNames);
+    const key = correlationKey(kind, tool_name, tool_input, toolUseId ?? input.tool_use_id);
+    // Stubbed calls were denied in PreToolUse — PostToolUseFailure owns recording.
+    if (pending.has(key)) return {};
     harness.recordCall(kind, tool_name, tool_input, { stubbed: false, output: tool_response });
     return {};
   };
 
-  const postToolUseFailure: ClaudeHookCallback = async (input) => {
+  const postToolUseFailure: ClaudeHookCallback = async (input, toolUseId) => {
     if (input.hook_event_name !== "PostToolUseFailure") return {};
-    const { tool_name, tool_input, tool_use_id: toolUseId } = input;
-    const key = toolUseId ?? "";
-    const stub = key ? pending.get(key) : undefined;
+    const { tool_name, tool_input } = input;
+    const kind = kindForTool(tool_name, skillNames, subagentNames);
+    const key = correlationKey(kind, tool_name, tool_input, toolUseId ?? input.tool_use_id);
+    const stub = pending.get(key);
     if (stub) {
       pending.delete(key);
       if (stub.error !== undefined) {
@@ -176,7 +191,6 @@ export function createClaudeAgentHooks(
     }
 
     // Non-mockist denial — still record if this looks like a real failure path.
-    const kind = kindForTool(tool_name, skillNames, subagentNames);
     harness.recordCall(kind, tool_name, tool_input, {
       stubbed: false,
       error: input.error_message ?? "tool failed",

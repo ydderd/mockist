@@ -1,7 +1,7 @@
 # SDK adapters (Claude Agent SDK, MCP, OpenAI) — design
 
-Status: approved design, implementation in progress. Roadmap: M2 item 4 (next gate).
-Authority: [`docs/BACKLOG.md`](../../BACKLOG.md).
+Status: **shipped** (2026-06-19). Roadmap: M2 item 4 (done). Authority:
+[`docs/BACKLOG.md`](../../BACKLOG.md).
 
 ## Goal
 
@@ -76,9 +76,9 @@ MCP servers handle `tools/call` at a single handler boundary.
 Wraps one tool handler: `({ arguments: input }) => result` routes through
 `harness.dispatch("tool", name, input, () => handler({ arguments: input }))`.
 
-### `wrapMcpHandlers(harness, handlers)`
+### `wrapMcpHandlers(handlers, harness)`
 
-`Record<string, McpToolHandler>` → wrapped map, same pattern as `wrapVercelTools`.
+`Record<string, McpToolHandler>` → wrapped map, same parameter order as `wrapVercelTools`.
 
 For **MCP clients** (agent calls a remote server), use `createMcpClientInterceptor(harness)`
 returning a `callTool(name, args)` wrapper.

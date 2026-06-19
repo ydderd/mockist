@@ -86,7 +86,12 @@
   "files": [
     "dist"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/matchers/vitest.js",
+    "./dist/matchers/vitest.cjs",
+    "./dist/matchers/jest.js",
+    "./dist/matchers/jest.cjs"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

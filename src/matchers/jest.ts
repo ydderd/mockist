@@ -2,6 +2,19 @@ import { expect } from "@jest/globals";
 import type { Harness } from "../core/harness";
 import { matcherContext } from "./shared";
 
+declare module "@jest/expect" {
+  interface Matchers<R> {
+    toHaveCalledTool(name: string): R;
+    toHaveCalledWith(name: string, partialInput: unknown): R;
+    toHaveToolTrajectory(expected: import("../core/assert").ExpectedCall[]): R;
+    toHaveToolSubsequence(expected: import("../core/assert").ExpectedCall[]): R;
+    toHaveNoUnhandledToolCalls(): R;
+    toHaveNoPassthroughToolCalls(): R;
+    toHaveNoExhaustedStubSequences(): R;
+    toHaveFullyUsedCassette(): R;
+  }
+}
+
 let activeHarness: Harness | undefined;
 
 export function useMockistHarness(harness: Harness): void {

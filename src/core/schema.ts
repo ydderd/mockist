@@ -89,7 +89,14 @@ export function validateStubsAgainstSchemas(stubs: Stub[], tools: ToolSchemaDef[
   for (const stub of stubs) {
     const tool = byKey.get(`${stub.kind ?? "tool"}:${stub.name}`);
     if (!tool?.outputSchema || !("result" in stub)) continue;
-    const result = typeof stub.result === "function" ? stub.result({}) : stub.result;
+    let result: unknown;
+    if (typeof stub.result === "function") {
+      // Only validate function stubs when args are known (static fixtures).
+      if (stub.args === undefined) continue;
+      result = stub.result(stub.args);
+    } else {
+      result = stub.result;
+    }
     try {
       validateAgainstJsonSchema(result, tool.outputSchema);
     } catch (e) {

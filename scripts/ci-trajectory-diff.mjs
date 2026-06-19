@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 
 const inputPath = process.argv[2];
-const header = "## mockist trajectory replay\n\n";
+const header = "## mockist test failures\n\n";
 
 if (!inputPath) {
   console.log(`${header}All cassette/trajectory tests passed.`);
@@ -33,7 +33,7 @@ if (failed.length === 0) {
   process.exit(0);
 }
 
-const lines = [header, `**${failed.length} test(s) failed** — trajectory or cassette regression detected.\n`];
+const lines = [header, `**${failed.length} test(s) failed.**\n`];
 for (const f of failed) {
   lines.push(`### ${f.name}`);
   lines.push(`\`${f.file}\`\n`);

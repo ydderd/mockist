@@ -94,7 +94,7 @@ export function createMockistClaudeHooks(
 //   { kind: "skill", name: "send_email", result: ... }
 
 // ---------------------------------------------------------------------------
-// 3. Merge with your own hooks (mockist matchers run first in each array)
+// 3. Merge with your own hooks (mockist hooks run first in each array)
 // ---------------------------------------------------------------------------
 
 type HookBucket = ClaudeAgentHooks[keyof ClaudeAgentHooks];

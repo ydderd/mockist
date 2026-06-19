@@ -97,3 +97,52 @@ test("PostToolUse records passthrough tool_response", async () => {
   );
   expect(harness.trajectory[0]).toMatchObject({ stubbed: false, output: { tempC: 5 } });
 });
+
+test("stub correlates via callback toolUseId when input omits tool_use_id", async () => {
+  const harness = createHarness({ stubs: [{ name: "weather", result: { tempC: 21 } }] });
+  const hooks = createClaudeAgentHooks(harness);
+  const pre = preHook(hooks);
+  const postFail = postFailureHook(hooks);
+
+  await pre(
+    { hook_event_name: "PreToolUse", tool_name: "weather", tool_input: { city: "Paris" } },
+    "tu-callback",
+    { signal: abort },
+  );
+  const failOut = await postFail(
+    {
+      hook_event_name: "PostToolUseFailure",
+      tool_name: "weather",
+      tool_input: { city: "Paris" },
+    },
+    "tu-callback",
+    { signal: abort },
+  );
+  expect(failOut.hookSpecificOutput?.updatedToolOutput).toBe(JSON.stringify({ tempC: 21 }));
+  expect(harness.trajectory).toHaveLength(1);
+});
+
+test("PostToolUse skips recording when stub is pending (deny path)", async () => {
+  const harness = createHarness({ stubs: [{ name: "weather", result: { ok: true } }] });
+  const hooks = createClaudeAgentHooks(harness);
+  const pre = preHook(hooks);
+  const post = hooks.PostToolUse[0]!.hooks[0]!;
+
+  await pre(
+    { hook_event_name: "PreToolUse", tool_name: "weather", tool_input: {}, tool_use_id: "tu-dup" },
+    "tu-dup",
+    { signal: abort },
+  );
+  await post(
+    {
+      hook_event_name: "PostToolUse",
+      tool_name: "weather",
+      tool_input: {},
+      tool_response: { should: "not-record" },
+      tool_use_id: "tu-dup",
+    },
+    "tu-dup",
+    { signal: abort },
+  );
+  expect(harness.trajectory).toHaveLength(0);
+});
