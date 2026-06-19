@@ -4,10 +4,11 @@
 > boundaries, record trajectories, and assert on what the agent did — derived from
 > the tool definitions you already wrote, with near-zero added effort.
 
-**Status:** **shipped** for **tool-boundary** stubbing and record → replay
-(`wrapVercelTools`, `createHarness`, trajectory assertions, hand-editable JSON cassettes).
-Next, all at the boundary: more SDK adapters and sub-agent / whole-workflow trajectory
-composition. **Scope:** mockist tests the **agentic tool/skill call boundary**, not the I/O
+**Status:** **shipped** for **tool-boundary** stubbing, record → replay, and multi-agent
+workflow composition v1 (`wrapVercelTools`, `createHarness`, trajectory assertions,
+hand-editable JSON cassettes, `mergeHarnessTrajectories` / `concatTrajectories`,
+`harness.recordCall`). Next, all at the boundary: more SDK adapters; runner matchers; CI
+replay. **Scope:** mockist tests the **agentic tool/skill call boundary**, not the I/O
 *inside* `execute` (that's ordinary unit testing — see [`docs/BACKLOG.md`](./docs/BACKLOG.md)
 "What NOT to build"). Usage: [README.md](./README.md). Roadmap, gates & findings:
 [`docs/BACKLOG.md`](./docs/BACKLOG.md).
@@ -60,12 +61,14 @@ than record.
 ## What it is / what it isn't
 
 **Is (shipped):** a thin wrapper around your SDK tools — stub whole `execute` calls,
-record every call in order, assert trajectories, and record → replay runs as hand-editable
-JSON cassettes. Two lines: `createHarness` + `wrapVercelTools`. Suite-wide defaults and
-per-test overrides via merged stub lists (see README — **layered stub registries**).
+record every call in order, assert trajectories, record → replay runs as hand-editable JSON
+cassettes, and observe multi-agent workflows (one shared harness or explicit trajectory
+merge + handoff markers). Two lines: `createHarness` + `wrapVercelTools`. Suite-wide defaults
+and per-test overrides via merged stub lists (see README — **layered stub registries**).
 
 **Is (next):** the same boundary harness across more agent SDKs (Claude Agent SDK, MCP,
-OpenAI) and across sub-agent / whole-workflow handoffs, plus runner matchers and CI replay.
+OpenAI), plus runner matchers and CI replay. Deferred from composition v1: `harness.fork()`
+and automatic sub-agent markers via adapters.
 
 **Isn't:** a dependency-replay / DB-HTTP-queue mocking layer for code *inside* `execute`
 (that's ordinary unit testing — out of scope); a new spec format; another generic
@@ -172,11 +175,12 @@ There's probably something — and the sharp version is **"the zero-spec test/st
 trajectory + stubbed tool-error injection (a stubbed tool throws; the error is recorded on
 the trajectory) on Synapse's real `createWorkflowTools` path with zero `vi.mock` of
 prisma/queue. (The dogfood drove a scripted model, so this validates error *recording*, not
-the model genuinely *deciding* to recover after seeing an error.) **Next gates (all at the
-boundary):** (1) sub-agent / whole-workflow trajectory composition — observe a multi-agent
-workflow's tool/skill calls through one harness; (2) a second SDK adapter (Claude Agent SDK
-/ MCP / OpenAI) proving the harness/recorder model generalizes. Dependency replay inside
-`execute` is explicitly **not** a gate — see the backlog's 2026-06-14 scope decision.
+the model genuinely *deciding* to recover after seeing an error.) **Gate (2026-06-19):**
+sub-agent / whole-workflow trajectory composition v1 — **passed** (`mergeHarnessTrajectories`,
+`concatTrajectories`, `harness.recordCall`; shared-harness and explicit-merge patterns in
+README). **Next gate (all at the boundary):** a second SDK adapter (Claude Agent SDK / MCP /
+OpenAI) proving the harness/recorder model generalizes. Dependency replay inside `execute` is
+explicitly **not** a gate — see the backlog's 2026-06-14 scope decision.
 
 ---
 

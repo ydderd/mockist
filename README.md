@@ -338,12 +338,15 @@ by timestamp). For a flat array, use `concatTrajectories(seg1, seg2, ...)`.
 
 ## Not yet (backlog)
 
-Next up, all at the agentic tool/skill **boundary**: sub-agent / whole-workflow trajectory
-composition; more SDK adapters (Claude Agent SDK / MCP / OpenAI); schema-grounded stubs;
-runner integrations (Vitest/Jest matchers wrapping the assertion helpers above); and a CI
-GitHub Action. Out of scope by design: dependency replay / DB-HTTP stubbing *inside*
-`execute` (that's ordinary unit testing — use `vi.mock` / nock / MSW / testcontainers).
-Source of truth and ordering: [`docs/BACKLOG.md`](docs/BACKLOG.md).
+Next up, all at the agentic tool/skill **boundary**: more SDK adapters (Claude Agent SDK /
+MCP / OpenAI); schema-grounded stubs; runner integrations (Vitest/Jest matchers wrapping
+the assertion helpers above); and a CI GitHub Action. Workflow composition v1 is shipped
+(shared harness, `mergeHarnessTrajectories` / `concatTrajectories`, `recordCall` handoff
+markers — see [Multi-agent workflows](#multi-agent-workflows-sub-agents--handoffs) above).
+Deferred from that work: `harness.fork()` and automatic sub-agent markers via adapters.
+Out of scope by design: dependency replay / DB-HTTP stubbing *inside* `execute` (that's
+ordinary unit testing — use `vi.mock` / nock / MSW / testcontainers). Source of truth and
+ordering: [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 ## License
 

@@ -59,6 +59,15 @@ Delivered and dogfooded on Synapse (2026-06-08). API reference: [README.md](../R
    expected-vs-actual diff with per-call name/input/output-or-error/stubbed. Also exposed
    `harness.sequenceState()` (see tech-debt item below). API: [README.md](../README.md#trajectory-assertion-helpers).
 
+5. **Sub-agent / whole-workflow harness composition (v1)** (2026-06-19) — observe a
+   multi-agent workflow's full tool/skill trajectory at the boundary. Pattern A: one shared
+   `Harness` threaded through every `wrapVercelTools` (with `mergeStubs` for per-agent stub
+   layers). Pattern B: `concatTrajectories` / `mergeHarnessTrajectories` to merge separate
+   loops; `harness.recordCall("subagent", …)` for handoff markers. Spec:
+   `docs/superpowers/specs/2026-06-14-subagent-workflow-composition-design.md`. API:
+   [README.md](../README.md#multi-agent-workflows-sub-agents--handoffs). Deferred:
+   `harness.fork()` (cassette cursor sharing); auto `kind: "subagent"` via adapters.
+
 ### Tech debt
 
 - ~~**Sequence exhaustion is not queryable**~~ **(resolved 2026-06-10)** — `harness.sequenceState()`
@@ -90,8 +99,9 @@ already well served by `vi.mock` / nock / MSW / Polly / testcontainers, and chas
 mockist off its actual job (testing/stubbing agentic tool & skill calls). See
 [What NOT to build](#what-not-to-build) and the [2026-06-14 scope decision](#2026-06-14--scope-decision-dependency-replay-cut).
 
-The next gates are **at the boundary**: reach (more SDK adapters) and whole-workflow
-trajectory composition — see the roadmap below.
+The next gate **at the boundary** is reach — a second SDK adapter (Claude Agent SDK / MCP /
+OpenAI) proving the harness/recorder model generalizes. Whole-workflow trajectory composition
+v1 shipped 2026-06-19 (see [Done #5](#done)); see the roadmap below for what remains.
 
 ---
 
@@ -123,12 +133,11 @@ model across more agent SDKs and across multi-agent workflows (M2), then host it
 Extend the boundary harness across more agent SDKs and across multi-agent workflows, then
 make boundary tests reproducible in CI. Same harness/recorder model, wider surface.
 
-3. **Sub-agent / whole-workflow harness composition** *(from the dogfood)* — v1 shipped
-   2026-06-14: `mergeHarnessTrajectories` / `concatTrajectories`, `harness.recordCall`
-   for handoff markers, README patterns (shared harness + explicit merge). Spec:
-   `docs/superpowers/specs/2026-06-14-subagent-workflow-composition-design.md`.
-   Deferred: `harness.fork()` (cassette cursor sharing); auto `kind: "subagent"` via
-   adapters.
+3. ~~**Sub-agent / whole-workflow harness composition**~~ **(done 2026-06-19)** — v1:
+   `mergeHarnessTrajectories` / `concatTrajectories`, `harness.recordCall` for handoff
+   markers, README patterns (shared harness + explicit merge). Spec:
+   `docs/superpowers/specs/2026-06-14-subagent-workflow-composition-design.md`. See
+   [Done #5](#done). Deferred: `harness.fork()`; auto `kind: "subagent"` via adapters.
 4. **More adapters** — Claude Agent SDK (tools, skills, AND sub-agents all flow through the
    `tool_name` path: PreToolUse `deny` + PostToolUse `updatedToolOutput`); MCP; OpenAI.
    Keep adapters thin: normalize tool definitions and route calls into the same
@@ -265,10 +274,10 @@ Synapse already relies on execute-wrapping surviving this path
   `CONTEXT_WRITE`/`OBSERVE`/`HUMAN_GATE` (in `lib/queue/workers/workflow-engine.ts`) call
   prisma/queue/notifications directly — never through a Vercel `tool()` — so there's no
   `execute` boundary to wrap.
-- **Sub-agent boundary.** Each agent / handoff sub-agent runs its own `generateWithTools`
-  loop with its own tool set; one harness only observes the tool set it wrapped. Watching a
-  whole multi-agent workflow with a single trajectory needs the harness applied at each
-  assembly point. → roadmap item 5.
+- **Sub-agent boundary (v1 addressed).** Each agent loop still has its own tool set; v1
+  covers whole-workflow trajectories via a shared harness (Pattern A) or explicit merge +
+  `recordCall` handoff markers (Pattern B). See README and [Done #5](#done). Still open:
+  `harness.fork()` for cassette cursor sharing; automatic sub-agent markers via adapters.
 - **`send_email` isn't a Vercel `tool()`** — it's a custom `IntegrationSkillDef`, so the
   current adapter doesn't cover it.
 - **Verification fidelity.** The shape check is at the tool-factory level, not a full

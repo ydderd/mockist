@@ -1,6 +1,7 @@
 # Sub-agent / whole-workflow harness composition — design
 
-Status: approved design, implementation in progress. Roadmap: M2 item 3.
+Status: **v1 shipped** (2026-06-19). Roadmap: M2 item 3 (done). Deferred v1.1 items
+listed under [Out of scope (v1)](#out-of-scope-v1).
 Authority: [`docs/BACKLOG.md`](../../BACKLOG.md).
 
 ## Goal
@@ -64,6 +65,17 @@ mark a delegate / handoff boundary between merged segments.
 
 ## Testing
 
+Covered in `test/composition.test.ts`:
+
 - `concatTrajectories` ordering and empty input
 - `mergeHarnessTrajectories` across two harnesses
 - `recordCall` subagent boundary shape
+
+## Implementation (v1)
+
+| API | Location |
+|-----|----------|
+| `concatTrajectories`, `mergeHarnessTrajectories` | `src/core/composition.ts`, exported from `src/index.ts` |
+| `harness.recordCall` | `src/core/harness.ts` |
+| Pattern A (shared harness) | No new code — pass one `Harness` to each `wrapVercelTools` |
+| Docs & examples | `README.md` — "Multi-agent workflows (sub-agents & handoffs)" |
