@@ -336,6 +336,23 @@ expect(trajectory.map((c) => c.name)).toEqual([
 resolver. `mergeHarnessTrajectories` concatenates segments in argument order (not
 by timestamp). For a flat array, use `concatTrajectories(seg1, seg2, ...)`.
 
+## Examples
+
+Each SDK has a **commented `integration.ts`** you can copy from, plus a README with
+call-flow diagrams. Start at [`examples/README.md`](examples/README.md).
+
+```bash
+npx vitest run examples/claude-agent-sdk   # one SDK
+npm test                                   # examples + unit tests
+```
+
+| SDK | Copy from |
+|-----|-----------|
+| Vercel AI SDK | [`examples/vercel-ai/integration.ts`](examples/vercel-ai/integration.ts) |
+| Claude Agent SDK | [`examples/claude-agent-sdk/integration.ts`](examples/claude-agent-sdk/integration.ts) |
+| MCP | [`examples/mcp/integration.ts`](examples/mcp/integration.ts) |
+| OpenAI | [`examples/openai/integration.ts`](examples/openai/integration.ts) |
+
 ## Not yet (backlog)
 
 M2 is shipped (adapters, schema stubs, matchers, CI replay v1). Deferred: `harness.fork()`,
