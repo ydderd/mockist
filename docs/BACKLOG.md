@@ -123,11 +123,12 @@ model across more agent SDKs and across multi-agent workflows (M2), then host it
 Extend the boundary harness across more agent SDKs and across multi-agent workflows, then
 make boundary tests reproducible in CI. Same harness/recorder model, wider surface.
 
-3. **Sub-agent / whole-workflow harness composition** *(from the dogfood)* — one harness
-   only observes the tool set it wrapped, and each sub-agent / handoff runs its own loop.
-   Provide a way to attach one harness across the sub-agent boundary, or merge trajectories
-   from multiple harnesses, so a whole workflow's tool/skill trajectory is observable. The
-   highest-value boundary-level reach item.
+3. **Sub-agent / whole-workflow harness composition** *(from the dogfood)* — v1 shipped
+   2026-06-14: `mergeHarnessTrajectories` / `concatTrajectories`, `harness.recordCall`
+   for handoff markers, README patterns (shared harness + explicit merge). Spec:
+   `docs/superpowers/specs/2026-06-14-subagent-workflow-composition-design.md`.
+   Deferred: `harness.fork()` (cassette cursor sharing); auto `kind: "subagent"` via
+   adapters.
 4. **More adapters** — Claude Agent SDK (tools, skills, AND sub-agents all flow through the
    `tool_name` path: PreToolUse `deny` + PostToolUse `updatedToolOutput`); MCP; OpenAI.
    Keep adapters thin: normalize tool definitions and route calls into the same

@@ -269,6 +269,73 @@ stubs and (in replay mode) the cassette resolver. They handle calls those layers
 overrides, merge stub arrays; reserve `resolvers` for dynamic or cross-cutting logic
 (e.g. logging).
 
+## Multi-agent workflows (sub-agents & handoffs)
+
+mockist's unit of test is the **tool/skill call boundary**. For workflows with more
+than one agent loop, use one of two patterns depending on how much control you have
+over tool assembly.
+
+### Pattern A — one shared harness (canonical when you control assembly)
+
+Pass the **same** `Harness` to every `wrapVercelTools` call — parent loop, nested
+sub-agent loop, and handoff tool factories. All calls land in one trajectory in
+execution order. Works for **nested** sub-agent loops (child runs inside a parent
+tool) and **sequential** handoffs when you can thread the harness through.
+
+```ts
+const harness = createHarness({
+  stubs: mergeStubs(CHILD_STUBS, PARENT_STUBS),
+  onUnhandled: "error",
+});
+
+const parentTools = wrapVercelTools(createParentTools(), harness);
+const childTools = wrapVercelTools(createChildTools(), harness);
+
+// parent loop → handoff / nested child loop → parent resumes
+// assert one trajectory:
+expect(harness.trajectory.map((c) => c.name)).toEqual([
+  "context_recall",
+  "delegate_to_researcher",
+  "search",
+  "summarize",
+  "send_reply",
+]);
+```
+
+Layer child stubs before parent stubs so child-specific overrides win (`mergeStubs`
+convention: test → fixture → suite, first match wins).
+
+### Pattern B — merge trajectories (separate loops)
+
+When each loop already has its own harness (library boundaries, separate test
+phases, or different `onUnhandled` policies), merge explicitly:
+
+```ts
+import {
+  createHarness,
+  mergeHarnessTrajectories,
+  wrapVercelTools,
+} from "mockist";
+
+const parentHarness = createHarness({ stubs: PARENT_STUBS });
+const childHarness = createHarness({ stubs: CHILD_STUBS });
+
+await runParentLoop(wrapVercelTools(parentTools, parentHarness));
+parentHarness.recordCall("subagent", "researcher", { task: "find docs" });
+await runChildLoop(wrapVercelTools(childTools, childHarness));
+
+const trajectory = mergeHarnessTrajectories(parentHarness, childHarness);
+expect(trajectory.map((c) => c.name)).toEqual([
+  "context_recall",
+  "researcher", // kind: "subagent" — handoff marker
+  "search",
+]);
+```
+
+`recordCall("subagent", name, input)` marks a handoff boundary without running a
+resolver. `mergeHarnessTrajectories` concatenates segments in argument order (not
+by timestamp). For a flat array, use `concatTrajectories(seg1, seg2, ...)`.
+
 ## Not yet (backlog)
 
 Next up, all at the agentic tool/skill **boundary**: sub-agent / whole-workflow trajectory

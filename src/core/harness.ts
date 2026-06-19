@@ -95,6 +95,21 @@ export class Harness {
   }
 
   /**
+   * Append a call directly to the trajectory without running the resolver pipeline.
+   * Use to mark sub-agent / handoff boundaries when loops use separate harnesses
+   * and you merge with {@link mergeHarnessTrajectories}.
+   */
+  recordCall(
+    kind: CallKind,
+    name: string,
+    input: unknown,
+    outcome: { stubbed: boolean; output?: unknown; error?: unknown } = { stubbed: true },
+  ): void {
+    const key = identify(kind, name, input);
+    this.push(kind, name, input, key, outcome);
+  }
+
+  /**
    * Resolve a call: first matching resolver wins (stub); otherwise apply the
    * unhandled-call policy. Records the call (or failure) either way.
    */
