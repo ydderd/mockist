@@ -5,6 +5,8 @@ test("exports the expected surface", () => {
   expect(typeof mockist.createHarness).toBe("function");
   expect(typeof mockist.defineStubs).toBe("function");
   expect(typeof mockist.wrapVercelTools).toBe("function");
+  expect(typeof mockist.concatTrajectories).toBe("function");
+  expect(typeof mockist.mergeHarnessTrajectories).toBe("function");
   expect(typeof mockist.identify).toBe("function");
 });
 
