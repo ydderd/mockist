@@ -2,6 +2,7 @@ import { afterAll, afterEach, expect, test, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { expectCassetteFullyUsed } from "../src/core/assert";
 import { createHarness } from "../src/core/harness";
 
 const dir = mkdtempSync(join(tmpdir(), "mockist-record-"));
@@ -42,6 +43,26 @@ test("save() is a no-op when no calls were recorded", async () => {
   const harness = createHarness({ cassette: path });
   await harness.save();
   expect(JSON.parse(readFileSync(path, "utf8")).calls[0].name).toBe("keep");
+});
+
+test("recordCall handoff markers stay out of cassettes so replay can fully consume entries", async () => {
+  process.env.MOCKIST_RECORD = "1";
+  const path = join(dir, "handoff.json");
+  const harness = createHarness({ cassette: path });
+  await harness.dispatch("tool", "plan", {}, async () => ({ ok: true }));
+  harness.recordCall("subagent", "researcher", { task: "find docs" });
+  expect(harness.trajectory).toHaveLength(2);
+
+  await harness.save();
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  expect(parsed.calls).toHaveLength(1);
+  expect(parsed.calls[0].name).toBe("plan");
+
+  delete process.env.MOCKIST_RECORD;
+  const replay = createHarness({ cassette: path, onUnhandled: "error" });
+  await replay.dispatch("tool", "plan", {}, async () => ({ ok: false }));
+  replay.recordCall("subagent", "researcher", { task: "find docs" });
+  expect(expectCassetteFullyUsed(replay.cassetteState()).pass).toBe(true);
 });
 
 test("flush after reset() still writes recorded calls (runner afterEach order)", async () => {

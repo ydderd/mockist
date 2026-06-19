@@ -98,6 +98,9 @@ export class Harness {
    * Append a call directly to the trajectory without running the resolver pipeline.
    * Use to mark sub-agent / handoff boundaries when loops use separate harnesses
    * and you merge with {@link mergeHarnessTrajectories}.
+   *
+   * Not written to cassettes in record mode — handoff markers are trajectory-only;
+   * replay consumes cassette entries only via {@link dispatch}.
    */
   recordCall(
     kind: CallKind,
@@ -106,7 +109,7 @@ export class Harness {
     outcome: { stubbed: boolean; output?: unknown; error?: unknown } = { stubbed: true },
   ): void {
     const key = identify(kind, name, input);
-    this.push(kind, name, input, key, outcome);
+    this.recorder.record({ kind, name, input, key, ts: Date.now(), ...outcome });
   }
 
   /**
