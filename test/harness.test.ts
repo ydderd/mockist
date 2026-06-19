@@ -222,3 +222,11 @@ test("resolveCall matches stubs without recording", async () => {
   expect(harness.trajectory).toHaveLength(0);
   expect(await harness.resolveCall("tool", "w", { city: "Berlin" })).toEqual({ matched: false });
 });
+
+test("resolveCall onUnhandled error records call before throwing", async () => {
+  const harness = createHarness({ onUnhandled: "error" });
+  await expect(harness.resolveCall("tool", "x", { a: 1 })).rejects.toThrow(/unhandled/);
+  expect(harness.trajectory).toHaveLength(1);
+  expect(harness.trajectory[0]).toMatchObject({ name: "x", input: { a: 1 }, stubbed: false });
+  expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
+});

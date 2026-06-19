@@ -49,11 +49,13 @@ test("subagent tool names map to kind subagent", async () => {
   const pre = preHook(hooks);
   const postFail = postFailureHook(hooks);
 
-  await pre(
+  const preOut = await pre(
     { hook_event_name: "PreToolUse", tool_name: "researcher", tool_input: { task: "x" }, tool_use_id: "tu-2" },
     "tu-2",
     { signal: abort },
   );
+  expect(preOut.hookSpecificOutput?.permissionDecision).toBe("deny");
+
   await postFail(
     {
       hook_event_name: "PostToolUseFailure",
@@ -64,7 +66,12 @@ test("subagent tool names map to kind subagent", async () => {
     "tu-2",
     { signal: abort },
   );
-  expect(harness.trajectory[0]).toMatchObject({ kind: "subagent", name: "researcher" });
+  expect(harness.trajectory[0]).toMatchObject({
+    kind: "subagent",
+    name: "researcher",
+    stubbed: true,
+    output: { ok: true },
+  });
 });
 
 test("unstubbed Claude tool: PreToolUse allows passthrough", async () => {

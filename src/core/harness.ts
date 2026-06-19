@@ -137,7 +137,9 @@ export class Harness {
       }
     }
     if (this.onUnhandled === "error") {
-      throw new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
+      const error = new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
+      this.recordCall(kind, name, input, { stubbed: false, error });
+      throw error;
     }
     if (this.onUnhandled === "warn") {
       console.warn(`mockist: unhandled ${kind} call "${name}" — passing through`);
