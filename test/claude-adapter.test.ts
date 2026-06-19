@@ -155,7 +155,8 @@ test("PostToolUse skips recording when stub is pending (deny path)", async () =>
     "tu-dup",
     { signal: abort },
   );
-  expect(harness.trajectory).toHaveLength(0);
+  expect(harness.trajectory).toHaveLength(1);
+  expect(harness.trajectory[0]).toMatchObject({ stubbed: true, output: { ok: true } });
 });
 
 test("Claude passthrough captureCall writes cassette in record mode", async () => {
@@ -217,4 +218,46 @@ test("Claude stubbed captureCall writes cassette in record mode", async () => {
   expect(parsed.calls).toHaveLength(1);
   expect(parsed.calls[0]).toMatchObject({ name: "weather", output: { tempC: 21 } });
   delete process.env.MOCKIST_RECORD;
+});
+
+test("Claude clears stale pending on allow so passthrough PostToolUse records", async () => {
+  const harness = createHarness({
+    stubs: [{
+      name: "poll",
+      sequence: [{ result: "first" }],
+      onSequenceExhausted: "passthrough",
+    }],
+  });
+  const hooks = createClaudeAgentHooks(harness);
+  const pre = preHook(hooks);
+  const post = hooks.PostToolUse[0]!.hooks[0]!;
+  const input = {};
+
+  await pre(
+    { hook_event_name: "PreToolUse", tool_name: "poll", tool_input: input },
+    undefined,
+    { signal: abort },
+  );
+  expect(harness.trajectory).toHaveLength(1);
+
+  const allowOut = await pre(
+    { hook_event_name: "PreToolUse", tool_name: "poll", tool_input: input },
+    undefined,
+    { signal: abort },
+  );
+  expect(allowOut.hookSpecificOutput?.permissionDecision).toBe("allow");
+
+  await post(
+    {
+      hook_event_name: "PostToolUse",
+      tool_name: "poll",
+      tool_input: input,
+      tool_response: { ok: true },
+    },
+    undefined,
+    { signal: abort },
+  );
+
+  expect(harness.trajectory).toHaveLength(2);
+  expect(harness.trajectory[1]).toMatchObject({ stubbed: false, output: { ok: true } });
 });

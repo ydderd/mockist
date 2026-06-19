@@ -218,9 +218,22 @@ test("reset rewinds sequence stub cursors", async () => {
 
 test("resolveCall matches stubs without recording", async () => {
   const harness = createHarness({ stubs: [{ name: "w", args: { city: "Paris" }, result: { tempC: 21 } }] });
-  expect(await harness.resolveCall("tool", "w", { city: "Paris" })).toEqual({ matched: true, output: { tempC: 21 } });
+  const hit = await harness.resolveCall("tool", "w", { city: "Paris" });
+  expect(hit).toMatchObject({ matched: true });
+  expect(await (hit as { produce: () => Promise<unknown> }).produce()).toEqual({ tempC: 21 });
   expect(harness.trajectory).toHaveLength(0);
   expect(await harness.resolveCall("tool", "w", { city: "Berlin" })).toEqual({ matched: false });
+});
+
+test("resolveCall does not advance sequence stubs until produce runs", async () => {
+  const harness = createHarness({
+    stubs: [{ name: "retry", sequence: [{ result: "first" }, { result: "second" }] }],
+  });
+  const hit = await harness.resolveCall("tool", "retry", {});
+  expect(harness.sequenceState()[0]?.consumed).toBe(0);
+  expect(await (hit as { produce: () => Promise<unknown> }).produce()).toBe("first");
+  expect(harness.sequenceState()[0]?.consumed).toBe(1);
+  expect(harness.trajectory).toHaveLength(0);
 });
 
 test("resolveCall onUnhandled error records call before throwing", async () => {

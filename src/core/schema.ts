@@ -121,15 +121,18 @@ function validateSequenceStepOutput(
   validateStubOutputAgainstSchema(result, tool, `sequence[${stepIndex}]`);
 }
 
-/**
- * Validate stub `result` values against tool output schemas where defined.
- * Throws {@link SchemaValidationError} on the first mismatch.
- */
-export function validateStubsAgainstSchemas(stubs: Stub[], tools: ToolSchemaDef[]): void {
-  const byKey = new Map(tools.map((t) => [`${t.kind ?? "tool"}:${t.name}`, t]));
-  for (const stub of stubs) {
-    const tool = byKey.get(`${stub.kind ?? "tool"}:${stub.name}`);
-    if (!tool?.outputSchema) continue;
+function findToolsForStub(stub: Stub, tools: ToolSchemaDef[]): ToolSchemaDef[] {
+  if (stub.kind !== undefined) {
+    const tool = tools.find((t) => (t.kind ?? "tool") === stub.kind && t.name === stub.name);
+    return tool ? [tool] : [];
+  }
+  // Kindless stubs match any catalog entry with the same name (tool/skill/subagent).
+  return tools.filter((t) => t.name === stub.name);
+}
+
+function validateStubAgainstTools(stub: Stub, tools: ToolSchemaDef[]): void {
+  for (const tool of tools) {
+    if (!tool.outputSchema) continue;
 
     if ("sequence" in stub && stub.sequence) {
       stub.sequence.forEach((step, i) => validateSequenceStepOutput(stub, step, i, tool));
@@ -140,6 +143,18 @@ export function validateStubsAgainstSchemas(stubs: Stub[], tools: ToolSchemaDef[
     const result = resolveStubResultForValidation(stub.result, stub.args);
     if (result === undefined && typeof stub.result === "function") continue;
     validateStubOutputAgainstSchema(result, tool);
+  }
+}
+
+/**
+ * Validate stub `result` values against tool output schemas where defined.
+ * Throws {@link SchemaValidationError} on the first mismatch.
+ */
+export function validateStubsAgainstSchemas(stubs: Stub[], tools: ToolSchemaDef[]): void {
+  for (const stub of stubs) {
+    const matches = findToolsForStub(stub, tools);
+    if (matches.length === 0) continue;
+    validateStubAgainstTools(stub, matches);
   }
 }
 

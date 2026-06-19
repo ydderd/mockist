@@ -118,10 +118,12 @@ export function createClaudeAgentHooks(
     if (input.hook_event_name !== "PreToolUse") return {};
     const { tool_name, tool_input } = input;
     const kind = kindForTool(tool_name, skillNames, subagentNames);
+    const key = correlationKey(kind, tool_name, tool_input, toolUseId ?? input.tool_use_id);
     const resolved = await harness.resolveCall(kind, tool_name, tool_input);
 
     if (resolved.matched) {
       if ("passthrough" in resolved) {
+        pending.delete(key);
         return {
           hookSpecificOutput: {
             hookEventName: "PreToolUse",
@@ -130,11 +132,13 @@ export function createClaudeAgentHooks(
           },
         };
       }
-      const key = correlationKey(kind, tool_name, tool_input, toolUseId ?? input.tool_use_id);
-      if ("error" in resolved) {
-        pending.set(key, { kind, name: tool_name, input: tool_input, error: resolved.error });
-      } else {
-        pending.set(key, { kind, name: tool_name, input: tool_input, output: resolved.output });
+      try {
+        const output = await resolved.produce();
+        harness.captureCall(kind, tool_name, tool_input, { stubbed: true, output });
+        pending.set(key, { kind, name: tool_name, input: tool_input, output });
+      } catch (error) {
+        harness.captureCall(kind, tool_name, tool_input, { stubbed: true, error });
+        pending.set(key, { kind, name: tool_name, input: tool_input, error });
       }
       return {
         hookSpecificOutput: {
@@ -145,6 +149,7 @@ export function createClaudeAgentHooks(
       };
     }
 
+    pending.delete(key);
     return {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -173,7 +178,6 @@ export function createClaudeAgentHooks(
     if (stub) {
       pending.delete(key);
       if (stub.error !== undefined) {
-        harness.captureCall(stub.kind, stub.name, stub.input, { stubbed: true, error: stub.error });
         return {
           hookSpecificOutput: {
             hookEventName: "PostToolUseFailure",
@@ -181,7 +185,6 @@ export function createClaudeAgentHooks(
           },
         };
       }
-      harness.captureCall(stub.kind, stub.name, stub.input, { stubbed: true, output: stub.output });
       return {
         hookSpecificOutput: {
           hookEventName: "PostToolUseFailure",

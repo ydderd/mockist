@@ -34,6 +34,8 @@ test("cassette public API is exported", () => {
 
 test("harness exposes resolveCall for hook adapters", async () => {
   const harness = mockist.createHarness({ stubs: [{ name: "ping", result: "pong" }] });
-  expect(await harness.resolveCall("tool", "ping", {})).toEqual({ matched: true, output: "pong" });
+  const resolved = await harness.resolveCall("tool", "ping", {});
+  expect(resolved).toMatchObject({ matched: true });
+  expect(await (resolved as { produce: () => Promise<unknown> }).produce()).toBe("pong");
   expect(harness.trajectory).toHaveLength(0);
 });

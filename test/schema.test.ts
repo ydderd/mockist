@@ -99,6 +99,19 @@ test("validateStubsAgainstSchemas skips sequence error steps", () => {
   ).not.toThrow();
 });
 
+test("validateStubsAgainstSchemas validates kindless stubs against subagent schemas", () => {
+  const stubs = defineStubs([{ name: "researcher", result: { tempC: "bad" } }]);
+  expect(() =>
+    validateStubsAgainstSchemas(stubs, [
+      {
+        name: "researcher",
+        kind: "subagent",
+        outputSchema: { type: "object", properties: { tempC: { type: "number" } } },
+      },
+    ]),
+  ).toThrow(SchemaValidationError);
+});
+
 test("validateTrajectoryOutputs checks passthrough outputs", async () => {
   const harness = createHarness();
   await wrapVercelTools(

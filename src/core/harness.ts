@@ -129,6 +129,9 @@ export class Harness {
   /**
    * Run the resolver chain without recording or invoking the real tool.
    * Used by SDK hook adapters (e.g. Claude PreToolUse) to decide stub vs passthrough.
+   *
+   * Returns a `produce` thunk on stub hits — the caller must invoke it (and record via
+   * {@link captureCall}) so sequence/cassette state is not consumed without a trajectory entry.
    */
   async resolveCall(
     kind: CallKind,
@@ -136,19 +139,14 @@ export class Harness {
     input: unknown,
   ): Promise<
     | { matched: true; passthrough: true }
-    | { matched: true; output: unknown }
-    | { matched: true; error: unknown }
+    | { matched: true; produce: () => Promise<unknown> }
     | { matched: false }
   > {
     for (const resolve of this.resolvers) {
       const hit = resolve({ kind, name, input });
       if (!hit) continue;
       if (hit.passthrough) return { matched: true, passthrough: true };
-      try {
-        return { matched: true, output: await hit.produce() };
-      } catch (error) {
-        return { matched: true, error };
-      }
+      return { matched: true, produce: () => Promise.resolve(hit.produce()) };
     }
     if (this.onUnhandled === "error") {
       const error = new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
