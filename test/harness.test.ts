@@ -230,3 +230,9 @@ test("resolveCall onUnhandled error records call before throwing", async () => {
   expect(harness.trajectory[0]).toMatchObject({ name: "x", input: { a: 1 }, stubbed: false });
   expect(harness.trajectory[0]!.error).toBeInstanceOf(Error);
 });
+
+test("captureCall records trajectory without running resolvers", async () => {
+  const harness = createHarness({ stubs: [{ name: "w", result: "stub" }] });
+  harness.captureCall("tool", "w", {}, { stubbed: false, output: "real" });
+  expect(harness.trajectory[0]).toMatchObject({ stubbed: false, output: "real" });
+});

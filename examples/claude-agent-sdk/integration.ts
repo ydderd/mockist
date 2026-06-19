@@ -16,13 +16,13 @@
  *                  → permissionDecision: "deny" (real tool never runs)
  *   PostToolUseFailure
  *                  → updatedToolOutput: <stub JSON> (model sees canned result)
- *                  → harness.recordCall(..., { stubbed: true })
+ *                  → harness.captureCall(..., { stubbed: true })
  *
  *   PASSTHROUGH call
  *   ----------------
  *   PreToolUse     no stub match → permissionDecision: "allow"
  *   (SDK runs real tool)
- *   PostToolUse    harness.recordCall(..., { stubbed: false, output: tool_response })
+ *   PostToolUse    harness.captureCall(..., { stubbed: false, output: tool_response })
  *
  * PRODUCTION WIRING
  * -----------------

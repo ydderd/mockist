@@ -113,6 +113,20 @@ export class Harness {
   }
 
   /**
+   * Record a tool outcome observed outside {@link dispatch} (e.g. Claude PostToolUse hooks).
+   * Persists to the cassette save buffer in record mode, unlike {@link recordCall}.
+   */
+  captureCall(
+    kind: CallKind,
+    name: string,
+    input: unknown,
+    outcome: { stubbed: boolean; output?: unknown; error?: unknown },
+  ): void {
+    const key = identify(kind, name, input);
+    this.push(kind, name, input, key, outcome);
+  }
+
+  /**
    * Run the resolver chain without recording or invoking the real tool.
    * Used by SDK hook adapters (e.g. Claude PreToolUse) to decide stub vs passthrough.
    */

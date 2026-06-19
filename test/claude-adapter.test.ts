@@ -1,8 +1,12 @@
 import { expect, test, vi } from "vitest";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createHarness } from "../src/core/harness";
 import { createClaudeAgentHooks, type PreToolUseHookInput } from "../src/adapters/claude";
 
 const abort = new AbortController().signal;
+const recordDir = mkdtempSync(join(tmpdir(), "mockist-claude-record-"));
 
 function preHook(hooks: ReturnType<typeof createClaudeAgentHooks>) {
   return hooks.PreToolUse[0]!.hooks[0]!;
@@ -152,4 +156,65 @@ test("PostToolUse skips recording when stub is pending (deny path)", async () =>
     { signal: abort },
   );
   expect(harness.trajectory).toHaveLength(0);
+});
+
+test("Claude passthrough captureCall writes cassette in record mode", async () => {
+  process.env.MOCKIST_RECORD = "1";
+  const path = join(recordDir, "claude-passthrough.json");
+  const harness = createHarness({ cassette: path });
+  const hooks = createClaudeAgentHooks(harness);
+  const post = hooks.PostToolUse[0]!.hooks[0]!;
+
+  await post(
+    {
+      hook_event_name: "PostToolUse",
+      tool_name: "weather",
+      tool_input: { city: "Berlin" },
+      tool_response: { tempC: 5 },
+      tool_use_id: "tu-rec",
+    },
+    "tu-rec",
+    { signal: abort },
+  );
+
+  await harness.save();
+  expect(existsSync(path)).toBe(true);
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  expect(parsed.calls).toHaveLength(1);
+  expect(parsed.calls[0]).toMatchObject({ name: "weather", output: { tempC: 5 } });
+  delete process.env.MOCKIST_RECORD;
+});
+
+test("Claude stubbed captureCall writes cassette in record mode", async () => {
+  process.env.MOCKIST_RECORD = "1";
+  const path = join(recordDir, "claude-stub.json");
+  const harness = createHarness({
+    cassette: path,
+    stubs: [{ name: "weather", result: { tempC: 21 } }],
+  });
+  const hooks = createClaudeAgentHooks(harness);
+  const pre = preHook(hooks);
+  const postFail = postFailureHook(hooks);
+
+  await pre(
+    { hook_event_name: "PreToolUse", tool_name: "weather", tool_input: { city: "Paris" }, tool_use_id: "tu-stub" },
+    "tu-stub",
+    { signal: abort },
+  );
+  await postFail(
+    {
+      hook_event_name: "PostToolUseFailure",
+      tool_name: "weather",
+      tool_input: { city: "Paris" },
+      tool_use_id: "tu-stub",
+    },
+    "tu-stub",
+    { signal: abort },
+  );
+
+  await harness.save();
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  expect(parsed.calls).toHaveLength(1);
+  expect(parsed.calls[0]).toMatchObject({ name: "weather", output: { tempC: 21 } });
+  delete process.env.MOCKIST_RECORD;
 });

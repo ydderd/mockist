@@ -62,6 +62,43 @@ test("validateStubsAgainstSchemas skips function stubs without args", () => {
   ).not.toThrow();
 });
 
+test("validateStubsAgainstSchemas validates sequence step outputs", () => {
+  const stubs = defineStubs([
+    {
+      name: "retry",
+      sequence: [{ result: { tempC: 21 } }, { result: { tempC: 22 } }],
+    },
+  ]);
+  expect(() =>
+    validateStubsAgainstSchemas(stubs, [
+      { name: "retry", outputSchema: { type: "object", properties: { tempC: { type: "number" } } } },
+    ]),
+  ).not.toThrow();
+});
+
+test("validateStubsAgainstSchemas rejects invalid sequence step outputs", () => {
+  const stubs = defineStubs([
+    {
+      name: "retry",
+      sequence: [{ result: { tempC: 21 } }, { result: { tempC: "hot" } }],
+    },
+  ]);
+  expect(() =>
+    validateStubsAgainstSchemas(stubs, [
+      { name: "retry", outputSchema: { type: "object", properties: { tempC: { type: "number" } } } },
+    ]),
+  ).toThrow(SchemaValidationError);
+});
+
+test("validateStubsAgainstSchemas skips sequence error steps", () => {
+  const stubs = defineStubs([{ name: "retry", sequence: [{ error: "boom" }] }]);
+  expect(() =>
+    validateStubsAgainstSchemas(stubs, [
+      { name: "retry", outputSchema: { type: "object", properties: { tempC: { type: "number" } } } },
+    ]),
+  ).not.toThrow();
+});
+
 test("validateTrajectoryOutputs checks passthrough outputs", async () => {
   const harness = createHarness();
   await wrapVercelTools(

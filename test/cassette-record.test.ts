@@ -45,6 +45,15 @@ test("save() is a no-op when no calls were recorded", async () => {
   expect(JSON.parse(readFileSync(path, "utf8")).calls[0].name).toBe("keep");
 });
 
+test("captureCall persists to cassette in record mode", async () => {
+  process.env.MOCKIST_RECORD = "1";
+  const path = join(dir, "capture.json");
+  const harness = createHarness({ cassette: path });
+  harness.captureCall("tool", "fetch", { q: "x" }, { stubbed: false, output: { ok: true } });
+  await harness.save();
+  expect(JSON.parse(readFileSync(path, "utf8")).calls).toHaveLength(1);
+});
+
 test("recordCall handoff markers stay out of cassettes so replay can fully consume entries", async () => {
   process.env.MOCKIST_RECORD = "1";
   const path = join(dir, "handoff.json");

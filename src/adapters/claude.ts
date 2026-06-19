@@ -160,7 +160,7 @@ export function createClaudeAgentHooks(
     const key = correlationKey(kind, tool_name, tool_input, toolUseId ?? input.tool_use_id);
     // Stubbed calls were denied in PreToolUse — PostToolUseFailure owns recording.
     if (pending.has(key)) return {};
-    harness.recordCall(kind, tool_name, tool_input, { stubbed: false, output: tool_response });
+    harness.captureCall(kind, tool_name, tool_input, { stubbed: false, output: tool_response });
     return {};
   };
 
@@ -173,7 +173,7 @@ export function createClaudeAgentHooks(
     if (stub) {
       pending.delete(key);
       if (stub.error !== undefined) {
-        harness.recordCall(stub.kind, stub.name, stub.input, { stubbed: true, error: stub.error });
+        harness.captureCall(stub.kind, stub.name, stub.input, { stubbed: true, error: stub.error });
         return {
           hookSpecificOutput: {
             hookEventName: "PostToolUseFailure",
@@ -181,7 +181,7 @@ export function createClaudeAgentHooks(
           },
         };
       }
-      harness.recordCall(stub.kind, stub.name, stub.input, { stubbed: true, output: stub.output });
+      harness.captureCall(stub.kind, stub.name, stub.input, { stubbed: true, output: stub.output });
       return {
         hookSpecificOutput: {
           hookEventName: "PostToolUseFailure",
@@ -191,7 +191,7 @@ export function createClaudeAgentHooks(
     }
 
     // Non-mockist denial — still record if this looks like a real failure path.
-    harness.recordCall(kind, tool_name, tool_input, {
+    harness.captureCall(kind, tool_name, tool_input, {
       stubbed: false,
       error: input.error_message ?? "tool failed",
     });

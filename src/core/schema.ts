@@ -1,5 +1,5 @@
 import type { Harness } from "./harness";
-import type { Call, CallKind, SequenceStubState, Stub } from "./types";
+import type { Call, CallKind, Stub, StubResult, StubSequenceStep } from "./types";
 
 /** Minimal JSON Schema shape for tool output validation. */
 export type JsonSchema = {
@@ -80,6 +80,47 @@ export function validateAgainstJsonSchema(value: unknown, schema: JsonSchema, pa
   }
 }
 
+function validateStubOutputAgainstSchema(
+  value: unknown,
+  tool: ToolSchemaDef,
+  detail?: string,
+): void {
+  try {
+    validateAgainstJsonSchema(value, tool.outputSchema!);
+  } catch (e) {
+    if (e instanceof SchemaValidationError) {
+      const message = detail ? `${detail}: ${e.message}` : e.message;
+      throw new SchemaValidationError(message, tool.name, e.path);
+    }
+    throw e;
+  }
+}
+
+/** Resolve a static stub result for schema validation; returns undefined when not checkable. */
+function resolveStubResultForValidation(
+  result: StubResult,
+  args: unknown | undefined,
+): unknown | undefined {
+  if (typeof result === "function") {
+    if (args === undefined) return undefined;
+    return result(args);
+  }
+  return result;
+}
+
+function validateSequenceStepOutput(
+  stub: Stub,
+  step: StubSequenceStep,
+  stepIndex: number,
+  tool: ToolSchemaDef,
+): void {
+  if ("error" in step && step.error !== undefined) return;
+  if (!("result" in step)) return;
+  const result = resolveStubResultForValidation(step.result, stub.args);
+  if (result === undefined && typeof step.result === "function") return;
+  validateStubOutputAgainstSchema(result, tool, `sequence[${stepIndex}]`);
+}
+
 /**
  * Validate stub `result` values against tool output schemas where defined.
  * Throws {@link SchemaValidationError} on the first mismatch.
@@ -88,23 +129,17 @@ export function validateStubsAgainstSchemas(stubs: Stub[], tools: ToolSchemaDef[
   const byKey = new Map(tools.map((t) => [`${t.kind ?? "tool"}:${t.name}`, t]));
   for (const stub of stubs) {
     const tool = byKey.get(`${stub.kind ?? "tool"}:${stub.name}`);
-    if (!tool?.outputSchema || !("result" in stub)) continue;
-    let result: unknown;
-    if (typeof stub.result === "function") {
-      // Only validate function stubs when args are known (static fixtures).
-      if (stub.args === undefined) continue;
-      result = stub.result(stub.args);
-    } else {
-      result = stub.result;
+    if (!tool?.outputSchema) continue;
+
+    if ("sequence" in stub && stub.sequence) {
+      stub.sequence.forEach((step, i) => validateSequenceStepOutput(stub, step, i, tool));
+      continue;
     }
-    try {
-      validateAgainstJsonSchema(result, tool.outputSchema);
-    } catch (e) {
-      if (e instanceof SchemaValidationError) {
-        throw new SchemaValidationError(e.message, tool.name, e.path);
-      }
-      throw e;
-    }
+
+    if (!("result" in stub)) continue;
+    const result = resolveStubResultForValidation(stub.result, stub.args);
+    if (result === undefined && typeof stub.result === "function") continue;
+    validateStubOutputAgainstSchema(result, tool);
   }
 }
 
