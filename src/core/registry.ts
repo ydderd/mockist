@@ -20,8 +20,9 @@ export function predicateResolver(stubs: Stub[]): ResettableResolver {
 
   const resolve: ResettableResolver = ({ kind, name, input }) => {
     for (const stub of stubs) {
-      const stubKind = stub.kind ?? "tool";
-      if (stubKind !== kind || stub.name !== name) continue;
+      if (stub.name !== name) continue;
+      // Omitted kind matches any call kind (e.g. Claude subagent/skill hooks with name-only stubs).
+      if (stub.kind !== undefined && stub.kind !== kind) continue;
 
       const matches = stub.match
         ? stub.match(input)

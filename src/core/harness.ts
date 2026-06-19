@@ -113,6 +113,53 @@ export class Harness {
   }
 
   /**
+   * Record a tool outcome observed outside {@link dispatch} (e.g. Claude PostToolUse hooks).
+   * Persists to the cassette save buffer in record mode, unlike {@link recordCall}.
+   */
+  captureCall(
+    kind: CallKind,
+    name: string,
+    input: unknown,
+    outcome: { stubbed: boolean; output?: unknown; error?: unknown },
+  ): void {
+    const key = identify(kind, name, input);
+    this.push(kind, name, input, key, outcome);
+  }
+
+  /**
+   * Run the resolver chain without recording or invoking the real tool.
+   * Used by SDK hook adapters (e.g. Claude PreToolUse) to decide stub vs passthrough.
+   *
+   * Returns a `produce` thunk on stub hits — the caller must invoke it (and record via
+   * {@link captureCall}) so sequence/cassette state is not consumed without a trajectory entry.
+   */
+  async resolveCall(
+    kind: CallKind,
+    name: string,
+    input: unknown,
+  ): Promise<
+    | { matched: true; passthrough: true }
+    | { matched: true; produce: () => Promise<unknown> }
+    | { matched: false }
+  > {
+    for (const resolve of this.resolvers) {
+      const hit = resolve({ kind, name, input });
+      if (!hit) continue;
+      if (hit.passthrough) return { matched: true, passthrough: true };
+      return { matched: true, produce: () => Promise.resolve(hit.produce()) };
+    }
+    if (this.onUnhandled === "error") {
+      const error = new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
+      this.recordCall(kind, name, input, { stubbed: false, error });
+      throw error;
+    }
+    if (this.onUnhandled === "warn") {
+      console.warn(`mockist: unhandled ${kind} call "${name}" — passing through`);
+    }
+    return { matched: false };
+  }
+
+  /**
    * Resolve a call: first matching resolver wins (stub); otherwise apply the
    * unhandled-call policy. Records the call (or failure) either way.
    */

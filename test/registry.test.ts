@@ -35,14 +35,16 @@ test("a throwing result function does not throw during matching", () => {
   expect(() => hit!.produce()).toThrow("x"); // throwing is deferred to produce()
 });
 
-test("kind must match (default kind is tool); first match wins", () => {
+test("omitted kind matches any call kind; explicit kind must match; first match wins", () => {
   const resolve = predicateResolver(defineStubs([
     { name: "x", args: { a: 1 }, result: "first" },
     { name: "x", result: "second" },
+    { kind: "tool", name: "y", result: "tool-only" },
   ]));
   expect(resolve({ kind: "tool", name: "x", input: { a: 1 } })?.produce()).toBe("first");
   expect(resolve({ kind: "tool", name: "x", input: { a: 2 } })?.produce()).toBe("second");
-  expect(resolve({ kind: "skill", name: "x", input: { a: 1 } })).toBeUndefined();
+  expect(resolve({ kind: "skill", name: "x", input: { a: 2 } })?.produce()).toBe("second");
+  expect(resolve({ kind: "skill", name: "y", input: {} })).toBeUndefined();
 });
 
 test("sequence stubs do not advance until produce() runs", () => {

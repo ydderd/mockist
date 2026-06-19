@@ -336,17 +336,63 @@ expect(trajectory.map((c) => c.name)).toEqual([
 resolver. `mergeHarnessTrajectories` concatenates segments in argument order (not
 by timestamp). For a flat array, use `concatTrajectories(seg1, seg2, ...)`.
 
+## Examples
+
+Each SDK has a **commented `integration.ts`** you can copy from, plus a README with
+call-flow diagrams. Start at [`examples/README.md`](examples/README.md).
+
+```bash
+npx vitest run examples/claude-agent-sdk   # one SDK
+npm test                                   # examples + unit tests
+```
+
+| SDK | Copy from |
+|-----|-----------|
+| Vercel AI SDK | [`examples/vercel-ai/integration.ts`](examples/vercel-ai/integration.ts) |
+| Claude Agent SDK | [`examples/claude-agent-sdk/integration.ts`](examples/claude-agent-sdk/integration.ts) |
+| MCP | [`examples/mcp/integration.ts`](examples/mcp/integration.ts) |
+| OpenAI | [`examples/openai/integration.ts`](examples/openai/integration.ts) |
+
 ## Not yet (backlog)
 
-Next up, all at the agentic tool/skill **boundary**: more SDK adapters (Claude Agent SDK /
-MCP / OpenAI); schema-grounded stubs; runner integrations (Vitest/Jest matchers wrapping
-the assertion helpers above); and a CI GitHub Action. Workflow composition v1 is shipped
-(shared harness, `mergeHarnessTrajectories` / `concatTrajectories`, `recordCall` handoff
-markers — see [Multi-agent workflows](#multi-agent-workflows-sub-agents--handoffs) above).
-Deferred from that work: `harness.fork()` and automatic sub-agent markers via adapters.
-Out of scope by design: dependency replay / DB-HTTP stubbing *inside* `execute` (that's
-ordinary unit testing — use `vi.mock` / nock / MSW / testcontainers). Source of truth and
-ordering: [`docs/BACKLOG.md`](docs/BACKLOG.md).
+M2 is shipped (adapters, schema stubs, matchers, CI replay v1). Deferred: `harness.fork()`,
+automatic sub-agent markers via adapters, cross-model CI replay. Next milestone: M3 hosted
+platform (upload cassettes, audit trail, team dashboards). Out of scope by design: dependency
+replay / DB-HTTP stubbing *inside* `execute`. Source of truth:
+[`docs/BACKLOG.md`](docs/BACKLOG.md).
+
+### SDK adapters
+
+```ts
+import { createClaudeAgentHooks, wrapMcpHandlers, wrapOpenAiTools } from "mockist";
+
+// Claude Agent SDK — pass hooks to ClaudeAgentOptions
+const claudeHooks = createClaudeAgentHooks(harness, { subagentNames: ["researcher"] });
+
+// MCP server handlers
+const handlers = wrapMcpHandlers({ search: async ({ arguments: a }) => ({ hits: [] }) }, harness);
+
+// OpenAI-style tools with execute
+const tools = wrapOpenAiTools({ get_weather: { execute: async (i) => i } }, harness);
+```
+
+### Vitest matchers
+
+```ts
+import "mockist/vitest-matchers";
+
+expect(harness).toHaveCalledTool("get_weather");
+expect(harness).toHaveToolTrajectory([{ name: "a" }, { name: "b" }]);
+```
+
+### Schema-grounded stubs
+
+```ts
+import { stubsFromSchemas, validateStubsAgainstSchemas } from "mockist";
+
+const stubs = stubsFromSchemas([{ name: "weather", outputSchema: { type: "object", properties: { tempC: { type: "number" } } } }]);
+validateStubsAgainstSchemas(stubs, toolDefs);
+```
 
 ## License
 
