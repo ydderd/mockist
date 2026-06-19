@@ -113,6 +113,39 @@ export class Harness {
   }
 
   /**
+   * Run the resolver chain without recording or invoking the real tool.
+   * Used by SDK hook adapters (e.g. Claude PreToolUse) to decide stub vs passthrough.
+   */
+  async resolveCall(
+    kind: CallKind,
+    name: string,
+    input: unknown,
+  ): Promise<
+    | { matched: true; passthrough: true }
+    | { matched: true; output: unknown }
+    | { matched: true; error: unknown }
+    | { matched: false }
+  > {
+    for (const resolve of this.resolvers) {
+      const hit = resolve({ kind, name, input });
+      if (!hit) continue;
+      if (hit.passthrough) return { matched: true, passthrough: true };
+      try {
+        return { matched: true, output: await hit.produce() };
+      } catch (error) {
+        return { matched: true, error };
+      }
+    }
+    if (this.onUnhandled === "error") {
+      throw new Error(`mockist: unhandled ${kind} call "${name}" (onUnhandled: 'error')`);
+    }
+    if (this.onUnhandled === "warn") {
+      console.warn(`mockist: unhandled ${kind} call "${name}" — passing through`);
+    }
+    return { matched: false };
+  }
+
+  /**
    * Resolve a call: first matching resolver wins (stub); otherwise apply the
    * unhandled-call policy. Records the call (or failure) either way.
    */

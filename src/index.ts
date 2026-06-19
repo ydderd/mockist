@@ -4,6 +4,24 @@ export { Recorder, type Redactor } from "./core/recorder";
 export { identify, stableStringify } from "./core/identity";
 export { deepEqual } from "./core/deep-equal";
 export { wrapVercelTools } from "./adapters/vercel";
+export {
+  createClaudeAgentHooks,
+  type ClaudeAgentHooks,
+  type ClaudeAgentHooksOptions,
+  type ClaudeHookInput,
+  type ClaudeHookOutput,
+} from "./adapters/claude";
+export {
+  wrapMcpToolHandler,
+  wrapMcpHandlers,
+  createMcpClientInterceptor,
+  type McpToolHandler,
+  type McpHandlerMap,
+} from "./adapters/mcp";
+export {
+  wrapOpenAiTools,
+  createOpenAiToolInterceptor,
+} from "./adapters/openai";
 export { concatTrajectories, mergeHarnessTrajectories } from "./core/composition";
 export {
   expectExactTrajectory,
@@ -20,7 +38,17 @@ export {
 } from "./core/assert";
 export { defaultRedactor, isRedacted, redactionSentinel, SECRET_KEYS } from "./core/cassette/redact";
 export { CASSETTE_FORMAT_VERSION } from "./core/cassette/format";
-export { flushPendingSaves } from "./core/cassette/registry";
+export {
+  validateAgainstJsonSchema,
+  validateStubsAgainstSchemas,
+  validateTrajectoryOutputs,
+  stubsFromSchemas,
+  placeholderFromSchema,
+  SchemaValidationError,
+  type JsonSchema,
+  type ToolSchemaDef,
+} from "./core/schema";
+export { mockistMatchers, type MockistMatchers } from "./matchers/shared";
 export type {
   Call,
   CallKind,

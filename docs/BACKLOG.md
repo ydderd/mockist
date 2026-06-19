@@ -68,6 +68,24 @@ Delivered and dogfooded on Synapse (2026-06-08). API reference: [README.md](../R
    [README.md](../README.md#multi-agent-workflows-sub-agents--handoffs). Deferred:
    `harness.fork()` (cassette cursor sharing); auto `kind: "subagent"` via adapters.
 
+6. **SDK adapters (Claude Agent SDK, MCP, OpenAI)** (2026-06-19) — `createClaudeAgentHooks`,
+   `wrapMcpHandlers` / `createMcpClientInterceptor`, `wrapOpenAiTools` /
+   `createOpenAiToolInterceptor`. `harness.resolveCall` for hook-based interception. Spec:
+   `docs/superpowers/specs/2026-06-19-sdk-adapters-design.md`. Gate: second-SDK reach
+   (Claude hooks + MCP + OpenAI) passed in unit tests.
+
+7. **Schema-grounded stubs** (2026-06-19) — `validateStubsAgainstSchemas`,
+   `stubsFromSchemas`, `validateTrajectoryOutputs`, `placeholderFromSchema` against a JSON
+   Schema subset.
+
+8. **Runner integrations (Vitest/Jest matchers)** (2026-06-19) — `mockist/vitest-matchers`,
+   `mockist/jest-matchers`: `toHaveCalledTool`, `toHaveToolTrajectory`,
+   `toHaveNoUnhandledToolCalls`, etc., backed by `src/core/assert.ts`.
+
+9. **GitHub Action + CI replay (v1)** (2026-06-19) — `.github/workflows/mockist-replay.yml`
+   runs the test suite on PRs; `scripts/ci-trajectory-diff.mjs` formats failure output for PR
+   comments. Deferred: cross-model replay (re-run scenarios with model swapped).
+
 ### Tech debt
 
 - ~~**Sequence exhaustion is not queryable**~~ **(resolved 2026-06-10)** — `harness.sequenceState()`
@@ -99,9 +117,11 @@ already well served by `vi.mock` / nock / MSW / Polly / testcontainers, and chas
 mockist off its actual job (testing/stubbing agentic tool & skill calls). See
 [What NOT to build](#what-not-to-build) and the [2026-06-14 scope decision](#2026-06-14--scope-decision-dependency-replay-cut).
 
-The next gate **at the boundary** is reach — a second SDK adapter (Claude Agent SDK / MCP /
-OpenAI) proving the harness/recorder model generalizes. Whole-workflow trajectory composition
-v1 shipped 2026-06-19 (see [Done #5](#done)); see the roadmap below for what remains.
+The next gate **at the boundary** was reach — a second SDK adapter proving the
+harness/recorder model generalizes. **Passed 2026-06-19** (Claude Agent SDK hooks, MCP, OpenAI
+adapters — see [Done #6](#done)). Whole-workflow trajectory composition v1 shipped 2026-06-19
+(see [Done #5](#done)). M2 items 4–7 shipped 2026-06-19 except cross-model CI replay (deferred
+from [Done #9](#done)). Next: M3 hosted platform.
 
 ---
 
@@ -138,20 +158,16 @@ make boundary tests reproducible in CI. Same harness/recorder model, wider surfa
    markers, README patterns (shared harness + explicit merge). Spec:
    `docs/superpowers/specs/2026-06-14-subagent-workflow-composition-design.md`. See
    [Done #5](#done). Deferred: `harness.fork()`; auto `kind: "subagent"` via adapters.
-4. **More adapters** — Claude Agent SDK (tools, skills, AND sub-agents all flow through the
-   `tool_name` path: PreToolUse `deny` + PostToolUse `updatedToolOutput`); MCP; OpenAI.
-   Keep adapters thin: normalize tool definitions and route calls into the same
-   harness/recorder model.
-5. **Schema-grounded stubs and fixtures** — validate stub output against the tool's JSON
-   Schema where available; optionally generate starter stubs from schema. Prevents fake
-   fixtures from drifting away from real tool contracts. Not the main value prop — SDKs
-   already do a lot of input validation.
-6. **Runner integrations** — optional Vitest/Jest matchers such as `toHaveCalledTool`,
-   `toHaveToolTrajectory`, `toHaveNoUnhandledToolCalls`, backed by the runner-agnostic
-   assertion core. Later than assertion helpers so the library doesn't become
-   test-runner-shaped too early.
-7. **GitHub Action + cross-model replay** — run the cassette/trajectory suite on PRs;
-   comment a diff; gate on regressions. Re-run scenarios with the model swapped.
+4. ~~**More adapters**~~ **(done 2026-06-19)** — Claude Agent SDK (`createClaudeAgentHooks`),
+   MCP (`wrapMcpHandlers`, `createMcpClientInterceptor`), OpenAI (`wrapOpenAiTools`). Spec:
+   `docs/superpowers/specs/2026-06-19-sdk-adapters-design.md`. See [Done #6](#done).
+5. ~~**Schema-grounded stubs and fixtures**~~ **(done 2026-06-19)** — `validateStubsAgainstSchemas`,
+   `stubsFromSchemas`, `validateTrajectoryOutputs`. See [Done #7](#done).
+6. ~~**Runner integrations**~~ **(done 2026-06-19)** — Vitest/Jest matchers via
+   `mockist/vitest-matchers` and `mockist/jest-matchers`. See [Done #8](#done).
+7. ~~**GitHub Action + cross-model replay**~~ **(CI v1 done 2026-06-19)** —
+   `.github/workflows/mockist-replay.yml` + trajectory diff script. Cross-model replay deferred.
+   See [Done #9](#done).
 
 ### M3 — Hosted (PLG rungs 3–4, the platform)
 

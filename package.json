@@ -58,6 +58,26 @@
         "types": "./dist/setup/jest.d.cts",
         "default": "./dist/setup/jest.cjs"
       }
+    },
+    "./vitest-matchers": {
+      "import": {
+        "types": "./dist/matchers/vitest.d.ts",
+        "default": "./dist/matchers/vitest.js"
+      },
+      "require": {
+        "types": "./dist/matchers/vitest.d.cts",
+        "default": "./dist/matchers/vitest.cjs"
+      }
+    },
+    "./jest-matchers": {
+      "import": {
+        "types": "./dist/matchers/jest.d.ts",
+        "default": "./dist/matchers/jest.js"
+      },
+      "require": {
+        "types": "./dist/matchers/jest.d.cts",
+        "default": "./dist/matchers/jest.cjs"
+      }
     }
   },
   "bin": {
@@ -72,7 +92,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "publish:public": "npm publish --access public"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "peerDependencies": {
     "ai": "^6.0.0",

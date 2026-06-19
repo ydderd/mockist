@@ -1,0 +1,54 @@
+name: mockist replay
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Run cassette and trajectory tests
+        id: tests
+        run: |
+          npm test -- --reporter=json --outputFile=vitest-results.json
+        continue-on-error: true
+
+      - name: Trajectory diff summary
+        if: always() && steps.tests.outcome == 'failure'
+        run: node scripts/ci-trajectory-diff.mjs vitest-results.json > trajectory-diff.md
+
+      - name: Comment PR with trajectory diff
+        if: github.event_name == 'pull_request' && steps.tests.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('trajectory-diff.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Fail job on test regression
+        if: steps.tests.outcome == 'failure'
+        run: exit 1

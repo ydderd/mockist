@@ -215,3 +215,10 @@ test("reset rewinds sequence stub cursors", async () => {
   await expect(harness.dispatch("tool", "flaky", {}, original)).rejects.toThrow("503");
   await expect(harness.dispatch("tool", "flaky", {}, original)).resolves.toBe("ok");
 });
+
+test("resolveCall matches stubs without recording", async () => {
+  const harness = createHarness({ stubs: [{ name: "w", args: { city: "Paris" }, result: { tempC: 21 } }] });
+  expect(await harness.resolveCall("tool", "w", { city: "Paris" })).toEqual({ matched: true, output: { tempC: 21 } });
+  expect(harness.trajectory).toHaveLength(0);
+  expect(await harness.resolveCall("tool", "w", { city: "Berlin" })).toEqual({ matched: false });
+});

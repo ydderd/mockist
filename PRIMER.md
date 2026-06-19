@@ -4,11 +4,9 @@
 > boundaries, record trajectories, and assert on what the agent did — derived from
 > the tool definitions you already wrote, with near-zero added effort.
 
-**Status:** **shipped** for **tool-boundary** stubbing, record → replay, and multi-agent
-workflow composition v1 (`wrapVercelTools`, `createHarness`, trajectory assertions,
-hand-editable JSON cassettes, `mergeHarnessTrajectories` / `concatTrajectories`,
-`harness.recordCall`). Next, all at the boundary: more SDK adapters; runner matchers; CI
-replay. **Scope:** mockist tests the **agentic tool/skill call boundary**, not the I/O
+**Status:** **shipped** for **tool-boundary** stubbing, record → replay, multi-agent
+workflow composition v1, SDK adapters (Claude/MCP/OpenAI), schema-grounded stubs, Vitest/Jest
+matchers, and CI replay v1. Next: M3 hosted platform. **Scope:** mockist tests the **agentic tool/skill call boundary**, not the I/O
 *inside* `execute` (that's ordinary unit testing — see [`docs/BACKLOG.md`](./docs/BACKLOG.md)
 "What NOT to build"). Usage: [README.md](./README.md). Roadmap, gates & findings:
 [`docs/BACKLOG.md`](./docs/BACKLOG.md).
@@ -147,8 +145,9 @@ The free, solo-dev rung must stand alone and be *relief, not ceremony*:
    need no extra API (merge stub arrays; first match wins).
 2. **Record → cassettes** (**shipped**) — freeze real tool-boundary calls (args + outcome)
    to a hand-editable JSON cassette and replay them deterministically.
-3. **Replay in CI / a GitHub Action** — run the cassette/trajectory suite on PRs, diff,
-   gate on regressions. **Next.**
+3. **Replay in CI / a GitHub Action** (**shipped v1**) — `.github/workflows/mockist-replay.yml`
+   runs the cassette/trajectory suite on PRs and comments a diff on failure. Cross-model
+   replay deferred.
 4. **Hosted run-suites** — audit trails, cross-model diffing, team gates, dashboards.
    **Future platform.**
 
