@@ -96,6 +96,7 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:smoke-pack": "node scripts/smoke-pack.mjs",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "publish:public": "npm publish --access public"
