@@ -101,7 +101,9 @@ Delivered and dogfooded on Synapse (2026-06-08). API reference: [README.md](../R
   `expectNoExhaustedSequences`.
 
 - **npm publish** — `0.1.0` is package-ready (`npm publish --dry-run` OK; `engines.node >= 22`)
-  but not yet on the npm registry. Dogfood today uses `file:` linking.
+  but not yet on the npm registry. CI/CD added: `.github/workflows/ci.yml` (verify +
+  tarball smoke test) and `.github/workflows/release.yml` (publish on `v*.*.*` tag with
+  `NPM_TOKEN`). See `docs/RELEASING.md`.
 
 - **Non-Vercel adapter dogfood** — Claude/MCP/OpenAI adapters pass unit tests and
   `examples/` integration tests (hook simulation for Claude; no live API keys). No second-repo

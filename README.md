@@ -396,8 +396,9 @@ validateStubsAgainstSchemas(stubs, toolDefs);
 
 ## License
 
-[Elastic License 2.0](LICENSE) — source-available. You may use, copy, modify, and
-redistribute mockist freely, **including inside commercial software**, with three
-limits: you may not offer it to third parties as a hosted or managed service, you
-may not circumvent license-key functionality, and you may not remove licensing
-notices. See [LICENSE](LICENSE) for the full terms.
+[Elastic License 2.0](LICENSE) — **source-available** (not OSI open source). You may use,
+copy, modify, and redistribute mockist freely, **including inside commercial software**,
+with three limits: you may not offer it to third parties as a hosted or managed service,
+you may not circumvent license-key functionality, and you may not remove licensing notices.
+
+Deep dive: [`docs/LICENSING.md`](docs/LICENSING.md). See [LICENSE](LICENSE) for full terms.
