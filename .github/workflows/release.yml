@@ -39,8 +39,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
           registry-url: https://registry.npmjs.org
+          # Do not cache in release builds (npm trusted publishing guidance).
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@latest && npm --version
 
       - name: Install
         run: npm ci
@@ -54,10 +57,10 @@ jobs:
       - name: Smoke-test packed tarball
         run: npm run test:smoke-pack
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish to npm (OIDC trusted publishing)
+        run: npm publish --access public
+        # No NODE_AUTH_TOKEN — auth via GitHub OIDC (id-token: write above).
+        # Provenance is generated automatically for public repos using trusted publishing.
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
