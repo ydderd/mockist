@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 First public release. M0–M2 are complete.
 
+**npm package name:** `@ydderd/mockist` (unscoped `mockist` is rejected by npm as too
+similar to `mockjs`).
+
 ### Added
 
 - **Core harness** — `createHarness`, declarative stubs, trajectory recording,
@@ -22,7 +25,7 @@ First public release. M0–M2 are complete.
   (`wrapMcpHandlers`, `createMcpClientInterceptor`), OpenAI (`wrapOpenAiTools`)
 - **Schema-grounded stubs** — `stubsFromSchemas`, `validateStubsAgainstSchemas`,
   `validateTrajectoryOutputs`
-- **Runner integrations** — `mockist/vitest-matchers`, `mockist/jest-matchers`
+- **Runner integrations** — `@ydderd/mockist/vitest-matchers`, `@ydderd/mockist/jest-matchers`
 - **CLI** — `mockist record -- <test command>`
 - **Examples** — per-SDK integration guides under `examples/`
 

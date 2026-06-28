@@ -10,13 +10,13 @@
  * ```ts
  * // vitest.config.ts
  * export default defineConfig({
- *   test: { setupFiles: ["mockist/vitest-matchers"] },
+ *   test: { setupFiles: ["@ydderd/mockist/vitest-matchers"] },
  * });
  * ```
  *
  * Or per file:
  * ```ts
- * import "mockist/vitest-matchers";
+ * import "@ydderd/mockist/vitest-matchers";
  * ```
  *
  * USAGE

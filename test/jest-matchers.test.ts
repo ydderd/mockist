@@ -1,6 +1,6 @@
 /**
  * Jest matchers use the same mockistMatchers core as Vitest (see src/matchers/shared.ts).
- * Jest's expect.extend lives in mockist/jest-matchers — import that in jest setupFilesAfterEnv.
+ * Jest's expect.extend lives in @ydderd/mockist/jest-matchers — import that in jest setupFilesAfterEnv.
  * We avoid importing @jest/globals under Vitest here; see examples/vitest-matchers/README.md.
  */
 import { expect, test } from "vitest";

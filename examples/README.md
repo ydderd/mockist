@@ -30,7 +30,7 @@ examples/
 mockist repo. In your app:
 
 ```ts
-import { createHarness, wrapVercelTools } from "mockist";
+import { createHarness, wrapVercelTools } from "@ydderd/mockist";
 ```
 
 ## Universal pattern
@@ -50,7 +50,7 @@ await generateText({ model, tools, prompt });  // or query(), callTool(), etc.
 
 // 4. Assert trajectory
 expect(harness.trajectory).toMatchObject([...]);
-// or: import "mockist/vitest-matchers"; expect(harness).toHaveCalledTool("x");
+// or: import "@ydderd/mockist/vitest-matchers"; expect(harness).toHaveCalledTool("x");
 ```
 
 ## Run

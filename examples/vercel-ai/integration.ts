@@ -2,8 +2,8 @@
  * Vercel AI SDK integration with mockist
  * ======================================
  *
- * Install:  npm install mockist ai zod
- * In-repo:  imports below use ../../src/index — swap for "mockist" when published.
+ * Install:  npm install @ydderd/mockist ai zod
+ * In-repo:  imports below use ../../src/index — swap for "@ydderd/mockist" when published.
  *
  * WHERE TO WIRE mockist
  * ---------------------

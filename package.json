@@ -1,5 +1,5 @@
 {
-  "name": "mockist",
+  "name": "@ydderd/mockist",
   "version": "0.1.0",
   "description": "Stub the tool calls your agent makes through the Vercel AI SDK — return canned values or errors, then assert the recorded call trajectory.",
   "license": "Elastic-2.0",
@@ -11,6 +11,9 @@
   },
   "bugs": {
     "url": "https://github.com/ydderd/mockist/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "ai",

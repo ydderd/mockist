@@ -29,13 +29,20 @@ Requirements:
 
 #### Step 1 — First publish (one time only)
 
-`mockist` is not on npm yet. Trusted publisher settings live on the **package**
-page, so you need the package to exist once:
+`@ydderd/mockist` is not on npm yet. The unscoped name `mockist` is blocked by npm
+(too similar to `mockjs`). Trusted publisher settings live on the **package** page,
+so you need the package to exist once:
 
 ```bash
 npm login          # maintainer account with 2FA
 npm run build
-npm publish --access public
+npm publish --access public   # publishConfig.access is already "public"
+```
+
+Package installs as:
+
+```bash
+npm install @ydderd/mockist ai zod
 ```
 
 Or publish once from npmjs.com after linking the package to this repo.
@@ -43,7 +50,7 @@ Or publish once from npmjs.com after linking the package to this repo.
 #### Step 2 — Configure trusted publisher on npmjs.com
 
 1. Log in to [npmjs.com](https://www.npmjs.com/) as the package owner (`ydderd` or your org).
-2. Open **Packages → mockist → Settings → Trusted publishing**.
+2. Open **Packages → @ydderd/mockist → Settings → Trusted publishing**.
 3. Click **GitHub Actions** and set:
 
    | Field | Value |

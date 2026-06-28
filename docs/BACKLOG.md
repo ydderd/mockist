@@ -100,9 +100,9 @@ Delivered and dogfooded on Synapse (2026-06-08). API reference: [README.md](../R
   tracks a per-stub drain counter so "ran dry" is distinguishable from "fully consumed". Powers
   `expectNoExhaustedSequences`.
 
-- **npm publish** — `0.1.0` is package-ready (`npm publish --dry-run` OK; `engines.node >= 22`)
-  but not yet on the npm registry. CI/CD: `.github/workflows/ci.yml` + `release.yml`
-  (npm **trusted publishing** via OIDC — no `NPM_TOKEN`; see `docs/RELEASING.md`).
+- **npm publish** — `@ydderd/mockist@0.1.0` (scoped; unscoped `mockist` blocked by npm).
+  CI/CD: `.github/workflows/ci.yml` + `release.yml` (npm **trusted publishing** via OIDC —
+  no `NPM_TOKEN`; see `docs/RELEASING.md`).
 
 - **Non-Vercel adapter dogfood** — Claude/MCP/OpenAI adapters pass unit tests and
   `examples/` integration tests (hook simulation for Claude; no live API keys). No second-repo

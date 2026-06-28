@@ -60,7 +60,7 @@ try {
         private: true,
         type: "module",
         dependencies: {
-          mockist: `file:${tarballPath}`,
+          "@ydderd/mockist": `file:${tarballPath}`,
           ai: "*",
           zod: "*",
         },
@@ -72,7 +72,7 @@ try {
 
   writeFileSync(
     join(workdir, "smoke.mjs"),
-    `import { createHarness, wrapVercelTools, expectCalledTool } from "mockist";
+    `import { createHarness, wrapVercelTools, expectCalledTool } from "@ydderd/mockist";
 import { createRequire } from "node:module";
 
 const harness = createHarness({ stubs: [{ name: "ping", result: "pong" }] });
@@ -85,15 +85,15 @@ if (!pass) throw new Error("expectCalledTool failed");
 // Subpath exports resolve in the tarball (matchers/setup pull vitest/jest at runtime).
 const require = createRequire(import.meta.url);
 for (const subpath of [
-  "mockist/vitest-setup",
-  "mockist/jest-setup",
-  "mockist/vitest-matchers",
-  "mockist/jest-matchers",
+  "@ydderd/mockist/vitest-setup",
+  "@ydderd/mockist/jest-setup",
+  "@ydderd/mockist/vitest-matchers",
+  "@ydderd/mockist/jest-matchers",
 ]) {
   require.resolve(subpath);
 }
 
-console.log("smoke-pack: mockist@${version} tarball imports OK");
+console.log("smoke-pack: @ydderd/mockist@${version} tarball imports OK");
 `,
   );
 

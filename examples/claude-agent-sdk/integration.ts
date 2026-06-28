@@ -2,8 +2,8 @@
  * Claude Agent SDK integration with mockist
  * =========================================
  *
- * Install:  npm install mockist @anthropic-ai/claude-agent-sdk
- * In-repo:  swap ../../src/index → "mockist"
+ * Install:  npm install @ydderd/mockist @anthropic-ai/claude-agent-sdk
+ * In-repo:  swap ../../src/index → "@ydderd/mockist"
  *
  * Claude routes every tool, skill, and sub-agent through the same hook surface:
  * PreToolUse → (optional deny) → tool runs → PostToolUse / PostToolUseFailure.
@@ -28,7 +28,7 @@
  * -----------------
  * ```ts
  * import { query } from "@anthropic-ai/claude-agent-sdk";
- * import { createHarness, createClaudeAgentHooks } from "mockist";
+ * import { createHarness, createClaudeAgentHooks } from "@ydderd/mockist";
  *
  * const harness = createHarness({ stubs: [...] });
  * const mockist = createClaudeAgentHooks(harness, {

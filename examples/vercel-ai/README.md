@@ -29,7 +29,7 @@ generateText({ tools: wrapVercelTools(myTools, harness), ... })
 
 ```ts
 import { generateText } from "ai";
-import { createHarness, wrapVercelTools } from "mockist";
+import { createHarness, wrapVercelTools } from "@ydderd/mockist";
 
 const harness = createHarness({
   stubs: [{ name: "get_weather", args: { city: "Paris" }, result: { tempC: 21 } }],

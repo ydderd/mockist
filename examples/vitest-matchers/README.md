@@ -7,11 +7,11 @@ Register once, assert on `harness` directly.
 ```ts
 // vitest.config.ts
 export default defineConfig({
-  test: { setupFiles: ["mockist/vitest-matchers"] },
+  test: { setupFiles: ["@ydderd/mockist/vitest-matchers"] },
 });
 ```
 
-Jest equivalent: add `mockist/jest-matchers` to `setupFilesAfterEnv` in `jest.config.js`.
+Jest equivalent: add `@ydderd/mockist/jest-matchers` to `setupFilesAfterEnv` in `jest.config.js`.
 See `test/jest-matchers.test.ts` for a smoke test.
 
 ## Matchers

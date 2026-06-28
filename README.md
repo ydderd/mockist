@@ -4,6 +4,10 @@ Stub the tool calls your agent makes through the Vercel AI SDK. A stubbed call
 returns a canned value (or throws); any other call runs the real tool. Every call
 is recorded so you can assert what the agent did.
 
+```bash
+npm install @ydderd/mockist ai zod
+```
+
 **Suite defaults + per-test overrides:** merge stub arrays (test first, suite
 last) — see [Layered stub registries](#layered-stub-registries).
 
@@ -11,7 +15,7 @@ last) — see [Layered stub registries](#layered-stub-registries).
 
 ```ts
 import { generateText } from "ai";
-import { createHarness, defineStubs, wrapVercelTools } from "mockist";
+import { createHarness, defineStubs, wrapVercelTools } from "@ydderd/mockist";
 
 const harness = createHarness({
   onUnhandled: "passthrough", // | "warn" | "error" (fail on any un-stubbed call)
@@ -88,8 +92,8 @@ A cassette is an overlay: matched calls are served from the file; unmatched call
 `onUnhandled`. In **record** mode (`MOCKIST_RECORD` set), real tools always run —
 `onUnhandled: "error"` is ignored so the cassette can capture live responses. Recording
 requires the once-registered setup module so cassettes flush without a per-test `save()` —
-Vitest: `setupFiles: ["mockist/vitest-setup"]`; Jest:
-`setupFilesAfterEnv: ["mockist/jest-setup"]`. Secrets in recorded inputs/outputs are scrubbed
+Vitest: `setupFiles: ["@ydderd/mockist/vitest-setup"]`; Jest:
+`setupFilesAfterEnv: ["@ydderd/mockist/jest-setup"]`. Secrets in recorded inputs/outputs are scrubbed
 to `[REDACTED:<field>]` (error messages are not redacted), and redacted input fields
 auto-wildcard so replay still matches. Per-entry `match: "name"` or
 `match: { ignore: ["input.requestId"] }` relax matching for name-only or noisy fields.
@@ -123,7 +127,7 @@ import {
   expectNoUnhandledCalls,   // nothing hit the onUnhandled policy (everything was stubbed)
   expectNoPassthroughCalls, // nothing ran the real tool (same guarantee, "stubbed" framing)
   expectNoExhaustedSequences,
-} from "mockist";
+} from "@ydderd/mockist";
 
 const { pass, message } = expectSubsequence(harness.trajectory, [
   { name: "get_weather", input: { city: "Paris" }, stubbed: true },
@@ -164,7 +168,7 @@ stubs are listed **before** broader catch-alls.
 Use `defineStubs` to name and export reusable lists (typed identity helper):
 
 ```ts
-import { createHarness, defineStubs, wrapVercelTools } from "mockist";
+import { createHarness, defineStubs, wrapVercelTools } from "@ydderd/mockist";
 
 // tests/helpers/tool-stubs.ts — shared across the suite
 export const SUITE_STUBS = defineStubs([
@@ -315,7 +319,7 @@ import {
   createHarness,
   mergeHarnessTrajectories,
   wrapVercelTools,
-} from "mockist";
+} from "@ydderd/mockist";
 
 const parentHarness = createHarness({ stubs: PARENT_STUBS });
 const childHarness = createHarness({ stubs: CHILD_STUBS });
@@ -364,7 +368,7 @@ replay / DB-HTTP stubbing *inside* `execute`. Source of truth:
 ### SDK adapters
 
 ```ts
-import { createClaudeAgentHooks, wrapMcpHandlers, wrapOpenAiTools } from "mockist";
+import { createClaudeAgentHooks, wrapMcpHandlers, wrapOpenAiTools } from "@ydderd/mockist";
 
 // Claude Agent SDK — pass hooks to ClaudeAgentOptions
 const claudeHooks = createClaudeAgentHooks(harness, { subagentNames: ["researcher"] });
@@ -379,7 +383,7 @@ const tools = wrapOpenAiTools({ get_weather: { execute: async (i) => i } }, harn
 ### Vitest matchers
 
 ```ts
-import "mockist/vitest-matchers";
+import "@ydderd/mockist/vitest-matchers";
 
 expect(harness).toHaveCalledTool("get_weather");
 expect(harness).toHaveToolTrajectory([{ name: "a" }, { name: "b" }]);
@@ -388,7 +392,7 @@ expect(harness).toHaveToolTrajectory([{ name: "a" }, { name: "b" }]);
 ### Schema-grounded stubs
 
 ```ts
-import { stubsFromSchemas, validateStubsAgainstSchemas } from "mockist";
+import { stubsFromSchemas, validateStubsAgainstSchemas } from "@ydderd/mockist";
 
 const stubs = stubsFromSchemas([{ name: "weather", outputSchema: { type: "object", properties: { tempC: { type: "number" } } } }]);
 validateStubsAgainstSchemas(stubs, toolDefs);
