@@ -1,568 +1,201 @@
 # mockist
 
-Unit test whether your agent called the right tools, with the right args, in the
-right order, without mocking the model or provider internals.
+Unit test the tool calls your agent makes: which tool, what args, what order,
+what result or error, and whether real code ran.
 
-mockist wraps the **agentic tool/skill call boundary**. A matching stub returns a
-canned value or throws a canned error; unmatched calls can fail fast or run the
-real tool. Every call is recorded as a trajectory so your test can assert what
-the agent actually did.
+mockist wraps the **agentic tool/skill boundary**. It does not mock the LLM,
+provider SDK, database, HTTP client, queue, or the internals of `execute`. It
+only controls and records the boundary where the agent calls your tools.
+
+## At a glance
+
+| | |
+|---|---|
+| **What it is** | A local test harness for agent **tool-call trajectories** — stubs, cassettes, assertions |
+| **What it tests** | Did the agent call the right tool/skill, with the right args, in the right order? |
+| **What it does not test** | Code *inside* a tool's `execute` (DB, HTTP, queues) — use `vi.mock`, MSW, testcontainers |
+| **Language** | TypeScript on **Node 22+** (Python port is a separate repo; see [backlog](docs/BACKLOG.md)) |
+| **Model** | Bring your own scripted/mock model (`MockLanguageModelV3`, etc.) — mockist does not stub the LLM |
+
+**Good fit:** you pass a tools array (or MCP handlers / Claude hooks) to an agent SDK and want fast, deterministic CI tests for tool-use behavior.
+
+**Poor fit:** you need to prove `execute` talks to Postgres correctly, or you use a framework with no hook/wrap point at the tool boundary (see [compatibility](#compatibility) below).
 
 ```bash
 npm install @ydderd/mockist ai zod
 ```
 
-Works today with Vercel AI SDK tools, MCP handlers/client calls, OpenAI-style
-tools, and Claude Agent SDK hooks. Start with Vercel below; adapter examples are
-linked in [Examples](#examples).
+## Compatibility
 
-What you get:
+### Supported today
 
-- **Stub tool calls** with canned outputs or errors.
-- **Assert trajectories**: tool name, args, order, output/error, and whether real code ran.
-- **Record/replay cassettes** from real tool-boundary runs for fast local/CI regression tests.
-- **Seal tests** with `onUnhandled: "error"` so unexpected tool calls fail instead of leaking
-  to real dependencies.
+| Library / surface | Adapter | Notes |
+|-------------------|---------|-------|
+| [Vercel AI SDK](https://sdk.vercel.ai/) (`ai`) | `wrapVercelTools(tools, harness)` | Primary adapter; dogfooded on a real app. Tools **without** `execute` (client-forwarded) pass through untouched. |
+| [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) | `createClaudeAgentHooks(harness)` | `PreToolUse` / `PostToolUse` hook interception. Tag skills/sub-agents via `skillNames` / `subagentNames`. |
+| MCP **server** handlers | `wrapMcpHandlers(handlers, harness)` | Wrap `tools/call` handlers on your server. |
+| MCP **client** calls | `createMcpClientInterceptor(harness)` | Intercept outbound `callTool` from your app. |
+| OpenAI-style local tools | `wrapOpenAiTools(tools, harness)` | Tools with a local `execute`; also `createOpenAiToolInterceptor` for manual dispatch. |
+| Vitest | `@ydderd/mockist/vitest-matchers` | `toHaveCalledTool`, `toHaveToolTrajectory`, cassette setup via `vitest-setup`. |
+| Jest | `@ydderd/mockist/jest-matchers` | Same matchers; setup via `jest-setup`. |
 
-## Quick start
+Runnable wiring for each row: [`examples/`](examples/README.md).
 
-This is the shape of a test mockist is built for: drive an agent loop, stub the
-tool boundary, and assert the tool trajectory.
+### Not supported (use something else)
+
+| You need | Why mockist is not the tool | Use instead |
+|----------|----------------------------|-------------|
+| Stub HTTP/DB/queue **inside** `execute` | That is implementation unit testing, not the agent boundary | `vi.mock`, nock, MSW, Polly, testcontainers |
+| Mock the LLM / model routing | Out of scope — mockist sits below the model, at tool dispatch | SDK mock models (`MockLanguageModelV3`), fixture responses |
+| **LangChain**, **LangGraph**, **LlamaIndex**, **CrewAI**, **AutoGen** | No first-party adapter yet | Wrap at your framework's tool `execute` boundary yourself, or open an issue; Python port may add LangChain first |
+| **Anthropic Messages API** (raw, no Agent SDK hooks) | No hook surface to intercept | Agent SDK hooks adapter, or wrap your own tool runner |
+| **Google Gemini** / Vertex tool calling | No adapter | Wrap local tool handlers if you control dispatch |
+| Custom skill systems that **never** hit `execute` or hooks | No intercept point (e.g. hard-coded integration skills) | Refactor to a hookable boundary, or test that layer directly |
+| Workflow steps with **no tool boundary** (conditions, transforms, queue workers) | Nothing to wrap | Ordinary unit/integration tests on that code path |
+| Python | Separate package (spec only today) | [`docs/superpowers/specs/2026-06-29-python-port-repo-spec.md`](docs/superpowers/specs/2026-06-29-python-port-repo-spec.md) |
+
+If your stack is "tools with `execute` (or MCP/Claude hooks) passed to an agent loop," mockist likely fits. If tool calls never converge on a single dispatch point you can wrap, fix that first or pick a narrower test layer.
+
+## Prompt for your coding agent
+
+Copy the block below into Cursor, Copilot, Claude Code, or similar when adding mockist to an existing repo. Replace the bracketed placeholders.
+
+<details>
+<summary>Copy prompt (click to expand)</summary>
+
+```text
+Integrate @ydderd/mockist into this repo for agent tool-boundary tests.
+
+Context:
+- mockist stubs/replays tool *calls* at the SDK boundary (name, args, order, result/error).
+- It does NOT mock the LLM, and does NOT replace vi.mock/MSW for code inside execute().
+- Package: npm install @ydderd/mockist (peer: ai ^6, zod ^4 for Vercel AI SDK).
+- Docs: README compatibility table + docs/GUIDE.md.
+
+My stack:
+- Agent SDK: [Vercel AI SDK | Claude Agent SDK | MCP server | MCP client | OpenAI local tools]
+- Test runner: [Vitest | Jest]
+- Entry point where tools are assembled: [file path or function name, e.g. createWorkflowTools()]
+
+Tasks:
+1. Find where tools/handlers are passed to the agent and wrap with the matching adapter:
+   - Vercel: wrapVercelTools(tools, harness)
+   - Claude Agent SDK: createClaudeAgentHooks(harness) in SDK options.hooks
+   - MCP server: wrapMcpHandlers(handlers, harness)
+   - MCP client: createMcpClientInterceptor(harness)
+   - OpenAI-style: wrapOpenAiTools(tools, harness)
+2. Add a test that uses createHarness({ stubs: [...], onUnhandled: "error" }) and a scripted/mock model (not a live API).
+3. Assert harness.trajectory (or vitest/jest matchers: import "@ydderd/mockist/vitest-matchers").
+4. Mirror patterns from mockist examples/<sdk>/integration.ts in the mockist repo if helpful.
+
+Do not mock prisma/fetch/queue inside tool execute for trajectory tests — stub at the tool boundary instead.
+```
+
+</details>
+
+More prompts (cassette record/replay, multi-agent, schema stubs): [docs/GUIDE.md — Prompts for coding agents](docs/GUIDE.md#prompts-for-coding-agents).
+
+## Why
+
+Agent tests often fail in one of two ways:
+
+- They mock too low, so the test proves your DB/HTTP mocks work but not that the
+  agent called the right tool.
+- They run live, so failures are slow, expensive, and hard to reproduce.
+
+mockist gives you a middle layer: deterministic tests for the agent's tool-use
+behavior.
+
+## The Shape
+
+In your existing test, wrap the tools before passing them to the agent:
 
 ```ts
-import { expect, test } from "vitest";
-import { generateText, stepCountIs, tool } from "ai";
-import { MockLanguageModelV3 } from "ai/test";
-import { z } from "zod";
 import {
   createHarness,
-  expectExactTrajectory,
+  expectCalledWith,
   expectNoPassthroughCalls,
   wrapVercelTools,
 } from "@ydderd/mockist";
 
-const usage = {
-  inputTokens: { total: undefined, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
-  outputTokens: { total: undefined, text: undefined, reasoning: undefined },
-};
-
-function scriptedWeatherAgent() {
-  let step = 0;
-  return new MockLanguageModelV3({
-    doGenerate: async () => {
-      if (step++ === 0) {
-        return {
-          content: [{
-            type: "tool-call",
-            toolCallId: "call_1",
-            toolName: "get_weather",
-            input: JSON.stringify({ city: "Paris" }),
-          }],
-          finishReason: { unified: "tool-calls", raw: undefined },
-          usage,
-          warnings: [],
-        };
-      }
-
-      return {
-        content: [{ type: "text", text: "It is 21C in Paris." }],
-        finishReason: { unified: "stop", raw: undefined },
-        usage,
-        warnings: [],
-      };
-    },
-  });
-}
-
-function createWeatherTools(realExecute: () => void) {
-  return {
-    get_weather: tool({
-      description: "Get the weather for a city",
-      inputSchema: z.object({ city: z.string() }),
-      execute: async ({ city }) => {
-        realExecute();
-        return { tempC: 99, city };
-      },
-    }),
-  };
-}
-
-test("agent calls the weather tool with the expected args", async () => {
-  let realCalls = 0;
-  const harness = createHarness({
-    onUnhandled: "error",
-    stubs: [{
+const harness = createHarness({
+  onUnhandled: "error",
+  stubs: [
+    {
       name: "get_weather",
       args: { city: "Paris" },
-      result: { tempC: 21, city: "Paris" },
-    }],
-  });
-
-  const result = await generateText({
-    model: scriptedWeatherAgent(),
-    tools: wrapVercelTools(createWeatherTools(() => { realCalls++; }), harness),
-    prompt: "What's the weather in Paris?",
-    stopWhen: stepCountIs(5),
-  });
-
-  expect(result.text).toContain("21C");
-  expect(realCalls).toBe(0);
-
-  expect(expectExactTrajectory(harness.trajectory, [{
-    name: "get_weather",
-    input: { city: "Paris" },
-    output: { tempC: 21, city: "Paris" },
-    stubbed: true,
-  }]).pass).toBe(true);
-
-  expect(expectNoPassthroughCalls(harness.trajectory).pass).toBe(true);
+      result: { city: "Paris", tempC: 21 },
+    },
+  ],
 });
+
+const result = await runAgent({
+  prompt: "What's the weather in Paris?",
+  tools: wrapVercelTools(myTools, harness),
+});
+
+expect(result.text).toContain("21");
+expect(expectCalledWith(harness.trajectory, "get_weather", { city: "Paris" }).pass).toBe(true);
+expect(expectNoPassthroughCalls(harness.trajectory).pass).toBe(true);
 ```
 
-Injecting a tool error uses the same boundary. This tests the agent's behavior
-when a tool fails without forcing the real dependency to fail:
+`runAgent` is your app's agent entry point. `myTools` are your real SDK tool
+definitions. mockist sits between them.
+
+For a runnable Vercel AI SDK test with `MockLanguageModelV3`, see
+[`examples/vercel-ai/stub-trajectory.test.ts`](examples/vercel-ai/stub-trajectory.test.ts).
+
+## What You Can Test
+
+| Need | Use |
+|------|-----|
+| Return canned tool output | `stubs: [{ name, args, result }]` |
+| Inject a tool failure | `result: () => { throw new Error("upstream 503"); }` |
+| Test retries or polling | `sequence: [{ error }, { result }]` |
+| Fail on unexpected tool calls | `onUnhandled: "error"` |
+| Assert call order and args | `harness.trajectory` + assertion helpers |
+| Freeze one live run | `cassette: "fixtures/flow.json"` + `MOCKIST_RECORD=1` |
+| Share default stubs | `defineStubs([...])` and merge arrays, narrowest first |
+
+## Record And Replay
+
+Cassettes are a feature, not the whole product: record a real tool-boundary run
+once, then replay the tool results in local/CI tests.
 
 ```ts
-const harness = createHarness({
-  stubs: [{
-    name: "get_weather",
-    args: { city: "Paris" },
-    result: () => { throw new Error("upstream 503"); },
-  }],
-});
-```
-
-For live runs, record once and replay every later test from a hand-editable
-cassette:
-
-```bash
-MOCKIST_RECORD=1 vitest weather-flow
-vitest weather-flow
-```
-
-```ts
-import {
-  cassetteExpectedCalls,
-  createHarness,
-  expectCassetteFullyUsed,
-  expectExactTrajectory,
-} from "@ydderd/mockist";
-
 const harness = createHarness({
   cassette: "fixtures/weather-flow.json",
   onUnhandled: "error",
 });
-
-// ...run the same agent flow...
-
-expect(expectExactTrajectory(harness.trajectory, cassetteExpectedCalls(harness)).pass).toBe(true);
-expect(expectCassetteFullyUsed(harness.cassetteState()).pass).toBe(true);
 ```
-
-On the first command, the real tool runs and mockist writes the cassette. On the
-second command, the same test serves matching tool calls from the file instead.
-
-**Suite defaults + per-test overrides:** merge stub arrays (test first, suite
-last) - see [Layered stub registries](#layered-stub-registries).
-
-## Matching
-
-A stub matches when its `kind` (default `"tool"`) and `name` match the call, and:
-its `match` predicate passes (if given), else its `args` deep-equal the input (if
-given), else it matches the name regardless of input. **First match wins** — stub
-order in the array is the override priority. No match runs the real `execute`
-(pass-through), unless `onUnhandled: "error"`.
-
-## Sequential stubs
-
-Use `sequence` when the same call should behave differently over time: retries,
-pagination, polling, or failure-then-success flows. Each matching call consumes
-one step. A step can return a `result` or throw an `error`.
-
-```ts
-const harness = createHarness({
-  stubs: [{
-    name: "search",
-    args: { q: "billing" },
-    sequence: [
-      { error: new Error("timeout") },
-      { result: { hits: ["doc-1"] } },
-    ],
-    onSequenceExhausted: "error", // default | "repeat-last" | "passthrough"
-  }],
-});
-```
-
-`"passthrough"` runs the real tool once the sequence is spent — and because the
-call *matched* a stub, it defers to that tool even under `onUnhandled: "error"`
-(the policy governs *un-stubbed* calls, not deliberate passthrough).
-
-## Record → replay (cassettes)
-
-Capture a real tool-boundary run once, replay it as a hand-editable JSON cassette.
-This turns a real agent/tool interaction into a stable unit test fixture.
-
-```ts
-// record once (either form runs real model + tools):
-//   MOCKIST_RECORD=1 vitest weather-flow
-//   mockist record -- vitest weather-flow
-// replay every run after:
-const harness = createHarness({
-  cassette: "fixtures/weather-flow.json",
-  onUnhandled: "error", // seal: a call the cassette didn't record fails. Omit for passthrough.
-});
-```
-
-A cassette is just ordered JSON:
-
-```json
-{
-  "mockist_format_version": 1,
-  "recordedAt": "2026-06-29T18:04:00Z",
-  "redactions": [],
-  "calls": [
-    {
-      "name": "get_weather",
-      "input": { "city": "Paris" },
-      "output": { "city": "Paris", "tempC": 21 }
-    }
-  ]
-}
-```
-
-Replay is consume-once. For each incoming tool call, mockist scans the cassette
-for the first unconsumed entry with the same `kind`/`name` and matching input.
-If it finds one, it returns the recorded `output` or throws the recorded `error`,
-marks that entry consumed, and records the call in `harness.trajectory` with
-`stubbed: true`.
-
-If no cassette entry matches, the call follows `onUnhandled`:
-
-- `onUnhandled: "error"` seals the test: unexpected tool calls fail
-- `onUnhandled: "passthrough"` lets unmatched calls run the real tool
-- `onUnhandled: "warn"` warns, then runs the real tool
-
-In **record** mode (`MOCKIST_RECORD` set), real tools always run and their boundary
-calls are captured. `onUnhandled: "error"` is ignored so a not-yet-existing cassette
-can be created. Recording requires the once-registered setup module so cassettes
-flush without a per-test `save()`:
-
-Vitest: `setupFiles: ["@ydderd/mockist/vitest-setup"]`; Jest:
-`setupFilesAfterEnv: ["@ydderd/mockist/jest-setup"]`.
-
-Secrets in recorded inputs/outputs are scrubbed to `[REDACTED:<field>]` (error
-messages are not redacted), and redacted input fields auto-wildcard so replay
-still matches. Per-entry `match: "name"` or
-`match: { ignore: ["input.requestId"] }` relax matching for name-only or noisy fields.
-
-Inspect coverage with `harness.cassetteState()` / `expectCassetteFullyUsed(...)`;
-assert call order (name/kind only) by feeding `cassetteExpectedCalls(harness)` to
-`expectExactTrajectory`.
-
-## Assertions
-
-`harness.trajectory` is a typed, read-only array of every call (`name`, `input`,
-`output`/`error`, `stubbed`). Helpers: `harness.callsTo(name)`,
-`harness.calledWith(name, input)`. Call `harness.reset()` between tests (clears
-trajectory, sequence cursors, and cassette consumption state; the stub list is fixed at
-`createHarness` time).
-
-### Trajectory assertion helpers
-
-For readable expectations with diffable failure output, mockist ships a small,
-**runner-agnostic** assertion layer over the trajectory. Each helper is a pure
-function that returns `{ pass, message() }` — it never throws and never imports a
-test framework, so it works under any runner (Vitest/Jest matchers will wrap it
-later). `message()` renders an expected-vs-actual diff showing each call's `name`,
-`input`, `output`/`error`, and `stubbed` status.
-
-```ts
-import {
-  expectExactTrajectory,    // full trajectory, in order (same length, every position matches)
-  expectSubsequence,        // expected calls appear in order; gaps allowed
-  expectCalledTool,         // at least one call to a tool name
-  expectCalledWith,         // a call to a tool whose input is a deep-superset of a partial
-  expectNoUnhandledCalls,   // nothing hit the onUnhandled policy (everything was stubbed)
-  expectNoPassthroughCalls, // nothing ran the real tool (same guarantee, "stubbed" framing)
-  expectNoExhaustedSequences,
-} from "@ydderd/mockist";
-
-const { pass, message } = expectSubsequence(harness.trajectory, [
-  { name: "get_weather", input: { city: "Paris" }, stubbed: true },
-  { name: "search" }, // name-only; output/error/stubbed optional
-]);
-if (!pass) throw new Error(message()); // or: expect(pass, message()).toBe(true)
-```
-
-Each expected call spec needs only `name`; provide `input`/`output`/`error`/
-`stubbed`/`kind` to tighten the match. In `expectExactTrajectory` and
-`expectSubsequence`, every *specified* field must deep-equal the recorded call.
-`expectCalledWith` matches on a **deep-subset** of the input (extra fields ignored).
-
-> `expectNoUnhandledCalls` and `expectNoPassthroughCalls` check the same bit
-> (`stubbed === false`) — two framings of the same guarantee. Use whichever reads
-> better for your `onUnhandled` mode (catch leaks to real tools, or assert full
-> stub coverage). Deliberate sequence passthrough (`onSequenceExhausted: "passthrough"`)
-> also records `stubbed: false`, so these helpers will flag it.
-
-### Sequence exhaustion
-
-`harness.sequenceState()` returns the consumption state of every `sequence` stub —
-`{ name, kind, length, consumed, exhausted }`. A sequence is `exhausted` once a
-matching call arrives after all its steps were consumed (it ran dry). Assert that
-no sequence was under-provisioned:
-
-```ts
-const { pass, message } = expectNoExhaustedSequences(harness.sequenceState());
-```
-
-## Layered stub registries
-
-You often want **suite-wide defaults** (stub slow or external tools everywhere)
-and **per-test overrides** (one scenario needs a specific response). mockist
-supports this today — no extra API — by **merging stub arrays** so narrower
-stubs are listed **before** broader catch-alls.
-
-Use `defineStubs` to name and export reusable lists (typed identity helper):
-
-```ts
-import { createHarness, defineStubs, wrapVercelTools } from "@ydderd/mockist";
-
-// tests/helpers/tool-stubs.ts — shared across the suite
-export const SUITE_STUBS = defineStubs([
-  {
-    name: "web_search",
-    match: () => true,
-    result: (input: { query: string }) => [
-      { title: `Stub: ${input.query}`, url: "https://example.test", snippet: "…" },
-    ],
-  },
-  {
-    name: "read_ontology",
-    match: () => true,
-    result: { success: true, content: "Default ICP and positioning." },
-  },
-]);
-
-export function mergeStubs(...layers: ReturnType<typeof defineStubs>[]) {
-  return layers.flat();
-}
-
-export function createTestHarness(testStubs = defineStubs([]), onUnhandled = "error" as const) {
-  return createHarness({
-    onUnhandled,
-    stubs: mergeStubs(testStubs, SUITE_STUBS),
-  });
-}
-```
-
-**Priority:** stubs from earlier layers win. Typical merge order:
-
-```
-test overrides  →  describe / fixture stubs  →  SUITE_STUBS (catch-alls last)
-```
-
-### Per-test override
-
-```ts
-import { createTestHarness, defineStubs } from "./helpers/tool-stubs";
-
-it("uses a specific web_search hit for this prospect", async () => {
-  const harness = createTestHarness(
-    defineStubs([
-      {
-        name: "web_search",
-        args: { query: "Acme Corp funding" },
-        result: [{ title: "Acme raises Series B", url: "https://example.test/acme", snippet: "…" }],
-      },
-      // read_ontology still comes from SUITE_STUBS — no need to repeat it
-    ]),
-  );
-
-  const tools = wrapVercelTools(myTools, harness);
-  // ...
-});
-```
-
-### How overrides interact
-
-| Test stub | Suite stub | Incoming call | Winner |
-|-----------|------------|---------------|--------|
-| `args: { query: "x" }` | `match: () => true` | `{ query: "x" }` | Test (listed first, args match) |
-| same | same | `{ query: "y" }` | Suite (test args don't match; suite catch-all does) |
-| `match: () => true, result: A` | `match: () => true, result: B` | any | Test (listed first) |
-
-To replace a tool entirely for one test, put a catch-all for that `name` in the
-test layer — it sits before the suite entry and always matches first.
-
-### Describe- or fixture-level stubs
-
-Same pattern: export `defineStubs([...])` for a workflow template, agent, or
-feature area and pass it as the first layer:
-
-```ts
-const PROSPECT_RESEARCH_STUBS = defineStubs([
-  { name: "web_search", args: { query: "…" }, result: [/* … */] },
-  { name: "read_ontology", args: { topics: "company,icp" }, result: { success: true, content: "…" } },
-]);
-
-const harness = createHarness({
-  stubs: mergeStubs(PROSPECT_RESEARCH_STUBS, SUITE_STUBS),
-  onUnhandled: "error",
-});
-```
-
-### Test runner lifecycle (Vitest / Jest)
-
-- **Same stubs every test:** one `createTestHarness()` in `beforeEach`, call
-  `harness.reset()` in `afterEach`.
-- **Different stubs per test:** create a **new harness** in that test (or in
-  `beforeEach` with test-specific config). `reset()` does not change which stubs
-  are registered.
-
-`onUnhandled: "error"` pairs well with a suite registry: any tool the agent
-calls that you forgot to stub fails fast instead of hitting real `execute`.
-
-### What `resolvers` are for
-
-`createHarness({ resolvers: [...] })` appends custom matchers **after** hand-authored
-stubs and (in replay mode) the cassette resolver. They handle calls those layers missed
-— they do **not** override an already-matching stub or cassette entry. For defaults +
-overrides, merge stub arrays; reserve `resolvers` for dynamic or cross-cutting logic
-(e.g. logging).
-
-## Multi-agent workflows (sub-agents & handoffs)
-
-mockist's unit of test is the **tool/skill call boundary**. For workflows with more
-than one agent loop, use one of two patterns depending on how much control you have
-over tool assembly.
-
-### Pattern A — one shared harness (canonical when you control assembly)
-
-Pass the **same** `Harness` to every `wrapVercelTools` call — parent loop, nested
-sub-agent loop, and handoff tool factories. All calls land in one trajectory in
-execution order. Works for **nested** sub-agent loops (child runs inside a parent
-tool) and **sequential** handoffs when you can thread the harness through.
-
-```ts
-const harness = createHarness({
-  stubs: mergeStubs(CHILD_STUBS, PARENT_STUBS),
-  onUnhandled: "error",
-});
-
-const parentTools = wrapVercelTools(createParentTools(), harness);
-const childTools = wrapVercelTools(createChildTools(), harness);
-
-// parent loop → handoff / nested child loop → parent resumes
-// assert one trajectory:
-expect(harness.trajectory.map((c) => c.name)).toEqual([
-  "context_recall",
-  "delegate_to_researcher",
-  "search",
-  "summarize",
-  "send_reply",
-]);
-```
-
-Layer child stubs before parent stubs so child-specific overrides win (`mergeStubs`
-convention: test → fixture → suite, first match wins).
-
-### Pattern B — merge trajectories (separate loops)
-
-When each loop already has its own harness (library boundaries, separate test
-phases, or different `onUnhandled` policies), merge explicitly:
-
-```ts
-import {
-  createHarness,
-  mergeHarnessTrajectories,
-  wrapVercelTools,
-} from "@ydderd/mockist";
-
-const parentHarness = createHarness({ stubs: PARENT_STUBS });
-const childHarness = createHarness({ stubs: CHILD_STUBS });
-
-await runParentLoop(wrapVercelTools(parentTools, parentHarness));
-parentHarness.recordCall("subagent", "researcher", { task: "find docs" });
-await runChildLoop(wrapVercelTools(childTools, childHarness));
-
-const trajectory = mergeHarnessTrajectories(parentHarness, childHarness);
-expect(trajectory.map((c) => c.name)).toEqual([
-  "context_recall",
-  "researcher", // kind: "subagent" — handoff marker
-  "search",
-]);
-```
-
-`recordCall("subagent", name, input)` marks a handoff boundary without running a
-resolver. `mergeHarnessTrajectories` concatenates segments in argument order (not
-by timestamp). For a flat array, use `concatTrajectories(seg1, seg2, ...)`.
-
-## Examples
-
-Each SDK has a **commented `integration.ts`** you can copy from, plus a README with
-call-flow diagrams. Start at [`examples/README.md`](examples/README.md).
 
 ```bash
-npx vitest run examples/claude-agent-sdk   # one SDK
-npm test                                   # examples + unit tests
+MOCKIST_RECORD=1 vitest weather-flow  # records real tool outputs
+vitest weather-flow                   # replays from the cassette
 ```
 
-| SDK | Copy from |
-|-----|-----------|
-| Vercel AI SDK | [`examples/vercel-ai/integration.ts`](examples/vercel-ai/integration.ts) |
-| Claude Agent SDK | [`examples/claude-agent-sdk/integration.ts`](examples/claude-agent-sdk/integration.ts) |
-| MCP | [`examples/mcp/integration.ts`](examples/mcp/integration.ts) |
-| OpenAI | [`examples/openai/integration.ts`](examples/openai/integration.ts) |
+The cassette stores tool name, input, output or error, and match rules. It does
+not record HTTP/DB calls inside your tool.
 
-## Not yet (backlog)
+## Docs Map
 
-M2 is shipped (adapters, schema stubs, matchers, CI replay v1). Before hosted,
-the next milestone is launch feedback plus second-repo dogfood for MCP/OpenAI/Claude
-adapters. Deferred: `harness.fork()`, automatic sub-agent markers via adapters,
-cross-model CI replay. Later M3: hosted upload of cassettes/runs, audit trail,
-team dashboards, and cross-model/version diffing. Out of scope by design:
-dependency replay / DB-HTTP stubbing *inside* `execute`. Source of truth:
-[`docs/BACKLOG.md`](docs/BACKLOG.md).
+- [Guide](docs/GUIDE.md): compatibility detail, agent prompts, stubs, cassettes, adapters
+- [Examples](examples/README.md): runnable copy-paste wiring per SDK
+- [Backlog](docs/BACKLOG.md): roadmap, scope decisions, findings
+- [Python port spec](docs/superpowers/specs/2026-06-29-python-port-repo-spec.md):
+  starting requirements for a separate Python package
 
-### SDK adapters
+## What Not To Use This For
 
-```ts
-import { createClaudeAgentHooks, wrapMcpHandlers, wrapOpenAiTools } from "@ydderd/mockist";
+mockist is not a replacement for unit tests of tool internals. If you own the
+tool body, test its DB/HTTP/queue behavior with normal tools such as `vi.mock`,
+nock/MSW/Polly, or testcontainers.
 
-// Claude Agent SDK — pass hooks to ClaudeAgentOptions
-const claudeHooks = createClaudeAgentHooks(harness, { subagentNames: ["researcher"] });
-
-// MCP server handlers
-const handlers = wrapMcpHandlers({ search: async ({ arguments: a }) => ({ hits: [] }) }, harness);
-
-// OpenAI-style tools with execute
-const tools = wrapOpenAiTools({ get_weather: { execute: async (i) => i } }, harness);
-```
-
-### Vitest matchers
-
-```ts
-import "@ydderd/mockist/vitest-matchers";
-
-expect(harness).toHaveCalledTool("get_weather");
-expect(harness).toHaveToolTrajectory([{ name: "a" }, { name: "b" }]);
-```
-
-### Schema-grounded stubs
-
-```ts
-import { stubsFromSchemas, validateStubsAgainstSchemas } from "@ydderd/mockist";
-
-const stubs = stubsFromSchemas([{ name: "weather", outputSchema: { type: "object", properties: { tempC: { type: "number" } } } }]);
-validateStubsAgainstSchemas(stubs, toolDefs);
-```
+mockist is also not an eval dashboard. It is a local, in-repo test harness for
+tool-call behavior.
 
 ## License
 
-[Elastic License 2.0](LICENSE) — **source-available** (not OSI open source). You may use,
-copy, modify, and redistribute mockist freely, **including inside commercial software**,
-with three limits: you may not offer it to third parties as a hosted or managed service,
-you may not circumvent license-key functionality, and you may not remove licensing notices.
-
-Deep dive: [`docs/LICENSING.md`](docs/LICENSING.md). See [LICENSE](LICENSE) for full terms.
+[Elastic License 2.0](LICENSE) - source-available, including commercial use, with
+the limits described in the license. See [docs/LICENSING.md](docs/LICENSING.md)
+for the practical summary.

@@ -3,6 +3,9 @@
 **Start here:** each SDK has an `integration.ts` with commented, copy-pasteable
 wiring code. Tests only verify that file — read `integration.ts` first.
 
+Not sure your stack is supported? See the [compatibility table](../README.md#compatibility)
+in the README. For coding-agent prompts, see [docs/GUIDE.md — Prompts for coding agents](../docs/GUIDE.md#prompts-for-coding-agents).
+
 | SDK | Integration code | Walkthrough |
 |-----|------------------|-------------|
 | Vercel AI SDK | [`vercel-ai/integration.ts`](./vercel-ai/integration.ts) | [`vercel-ai/README.md`](./vercel-ai/README.md) |
