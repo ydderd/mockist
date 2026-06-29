@@ -192,6 +192,11 @@ make boundary tests reproducible in CI. Same harness/recorder model, wider surfa
 second-repo dogfood for Claude/MCP/OpenAI adapters; `harness.fork()`; automatic sub-agent
 markers via adapters.
 
+**Adjacent / separate repo:** Python port starting spec:
+`docs/superpowers/specs/2026-06-29-python-port-repo-spec.md`. Recommendation: build as a
+separate `mockist-py` / `mockist-python` repo with compatible cassette format v1, rather
+than folding Python packaging and adapters into this TypeScript repo.
+
 ### M3 — Hosted (PLG rungs 3–4, the platform)
 
 9. Upload cassettes/runs; audit trail; team dashboards; cross-model/version diffing as a
